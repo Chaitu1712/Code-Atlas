@@ -1,0 +1,10 @@
+tree-sitter==0.25.1
+tree-sitter-python==0.23.6
+faiss-cpu==1.7.4
+sentence-transformers==2.2.2
+llama-cpp-python==0.2.90
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+pydantic==2.7.0
+orjson==3.10.7
+pytest==8.2.0

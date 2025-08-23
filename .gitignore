@@ -1,0 +1,7 @@
+code_atlas/
+data/
+outputs/
+app/__pycache__/
+sample/
+models/
+.vscode/

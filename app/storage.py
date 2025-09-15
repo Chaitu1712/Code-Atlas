@@ -24,7 +24,7 @@ def build_faiss_index(parsed_json, dim):
     with open(IDMAP_PATH, "w", encoding="utf-8") as f:
         json.dump(id_map, f, indent=2)
 
-    print(f"✅ Built FAISS index with {len(id_map)} vectors")
+    print(f"Built FAISS index with {len(id_map)} vectors")
 
 def load_faiss_index():
     index = faiss.read_index(INDEX_PATH)
@@ -34,23 +34,3 @@ def load_faiss_index():
         parsed = json.load(f)
     id_to_element = {el["id"]: el for el in parsed["elements"]}
     return index, id_map, id_to_element
-
-def search_codebase(query: str, top_k=5):
-    index, id_map, id_to_element = load_faiss_index()
-    q_vec = np.array([embed_code(query)], dtype="float32")
-    D, I = index.search(q_vec, top_k)
-
-    results = []
-    for dist, idx in zip(D[0], I[0]):
-        if idx < len(id_map):
-            el_id = id_map[idx]
-            el = id_to_element[el_id]
-            results.append({
-                "id": el_id,
-                "score": float(dist),
-                "file": el.get("file"),
-                "type": el.get("type"),
-                "name": el.get("name"),
-                "code": el.get("code"),
-            })
-    return results

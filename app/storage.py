@@ -1,7 +1,7 @@
 import faiss
 import numpy as np
 import json, os
-from embedder import embed_code
+from app.embedder import embed_code
 
 INDEX_PATH = "data/codeatlas.index"
 IDMAP_PATH = "data/id_map.json"

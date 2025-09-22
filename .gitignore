@@ -6,3 +6,5 @@ sample/
 models/
 .vscode/
 app/test.py
+tree.txt
+text.json

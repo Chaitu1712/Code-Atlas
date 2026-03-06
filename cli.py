@@ -7,16 +7,20 @@ from core.parser import CodeParser
 from core.db import Database
 from core.analyzer import GraphAnalyzer
 from core.embeddings import EmbeddingService
+from core.ignore import GitIgnoreChecker
 
 def parse_directory(target_dir: str, db: Database):
     parser = CodeParser()
     path = Path(target_dir)
     py_files = list(path.rglob("*.py"))
-    print(f"Found {len(py_files)} Python files. Parsing...")
+    ignore_checker = GitIgnoreChecker(target_dir)
+    
+    # Filter files
+    valid_files = [f for f in py_files if not ignore_checker.is_ignored(f)]
+    
+    print(f"Found {len(py_files)} Python files. ({len(py_files) - len(valid_files)} ignored). Parsing {len(valid_files)} files...")
 
-    for file in py_files:
-        if "venv" in file.parts or ".git" in file.parts:
-            continue
+    for file in valid_files:
         try:
             parsed = parser.parse_file(str(file))
             db.save_module(parsed)

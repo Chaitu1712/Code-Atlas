@@ -18,44 +18,59 @@ class Database:
                 file_id INTEGER,
                 name TEXT,
                 node_type TEXT,
+                parent_name TEXT,     -- <-- NEW COLUMN
                 start_line INTEGER,
                 end_line INTEGER,
-                code_snippet TEXT,  -- <-- NEW COLUMN
+                code_snippet TEXT,
                 FOREIGN KEY(file_id) REFERENCES files(id)
             );
             CREATE TABLE IF NOT EXISTS imports (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 file_id INTEGER,
                 imported_module TEXT,
-                imported_names TEXT,  -- <-- NEW COLUMN
+                imported_names TEXT,
+                line INTEGER,
+                FOREIGN KEY(file_id) REFERENCES files(id)
+            );
+            CREATE TABLE IF NOT EXISTS calls (    -- <-- NEW TABLE
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                file_id INTEGER,
+                caller TEXT,
+                callee TEXT,
                 line INTEGER,
                 FOREIGN KEY(file_id) REFERENCES files(id)
             );
         """)
         self.conn.commit()
 
-
     def save_module(self, module):
-        # Insert File
         self.cursor.execute("INSERT OR REPLACE INTO files (filepath) VALUES (?)", (module.filepath,))
         file_id = self.cursor.execute("SELECT id FROM files WHERE filepath = ?", (module.filepath,)).fetchone()[0]
 
-        # Clear old data
         self.cursor.execute("DELETE FROM nodes WHERE file_id = ?", (file_id,))
         self.cursor.execute("DELETE FROM imports WHERE file_id = ?", (file_id,))
+        self.cursor.execute("DELETE FROM calls WHERE file_id = ?", (file_id,)) # <-- Clear old calls
 
         # Insert Classes & Functions
         for node in module.classes + module.functions:
             self.cursor.execute("""
-                INSERT INTO nodes (file_id, name, node_type, start_line, end_line, code_snippet)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (file_id, node.name, node.node_type, node.range.start_line, node.range.end_line, node.code_snippet))
+                INSERT INTO nodes (file_id, name, node_type, parent_name, start_line, end_line, code_snippet)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (file_id, node.name, node.node_type, node.parent_name, node.range.start_line, node.range.end_line, node.code_snippet))
+
         # Insert Imports
         for imp in module.imports:
-            names_str = ",".join(imp.names) # Convert list to comma-separated string
+            names_str = ",".join(imp.names)
             self.cursor.execute("""
                 INSERT INTO imports (file_id, imported_module, imported_names, line)
                 VALUES (?, ?, ?, ?)
             """, (file_id, imp.module, names_str, imp.line))
+
+        # Insert Calls
+        for call in module.calls:
+            self.cursor.execute("""
+                INSERT INTO calls (file_id, caller, callee, line)
+                VALUES (?, ?, ?, ?)
+            """, (file_id, call.caller, call.callee, call.line))
 
         self.conn.commit()

@@ -13,10 +13,16 @@ class ParsedNode(BaseModel):
     node_type: str
     range: CodeRange
     code_snippet: Optional[str] = None
-
+    parent_name: Optional[str] = None
+    
 class ParsedImport(BaseModel):
     module: str
-    names: List[str] =[]   # <-- NEW: Stores what specific classes/functions were imported
+    names: List[str] =[]
+    line: int
+
+class ParsedCall(BaseModel):
+    caller: str
+    callee: str
     line: int
 
 class ParsedModule(BaseModel):
@@ -24,3 +30,4 @@ class ParsedModule(BaseModel):
     classes: List[ParsedNode] = []
     functions: List[ParsedNode] = []
     imports: List[ParsedImport] =[]
+    calls: List[ParsedCall] = [] 

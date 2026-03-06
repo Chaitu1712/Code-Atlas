@@ -1,23 +1,54 @@
+# core/parser.py
 import tree_sitter_python as tspython
 from tree_sitter import Language, Parser, Query, QueryCursor
-from core.models import ParsedModule, ParsedNode, CodeRange, ParsedImport
+from core.models import ParsedModule, ParsedNode, CodeRange, ParsedImport, ParsedCall
 
 class CodeParser:
     def __init__(self):
         self.language = Language(tspython.language())
         self.parser = Parser(self.language)
         
-        # Existing query for classes/functions
         self.struct_query = Query(self.language, """
             (class_definition name: (identifier) @class.name) @class.def
             (function_definition name: (identifier) @func.name) @func.def
         """)
         
-        # NEW: Query for imports
         self.import_query = Query(self.language, """
             (import_statement) @import
             (import_from_statement) @import_from
         """)
+
+        # NEW: Query to find function calls
+        self.call_query = Query(self.language, """
+            (call function: (_) @call.func)
+        """)
+
+    def _get_enclosing_scope(self, node) -> str:
+        """Walks up the AST to find the function and class that contains this node."""
+        current = node.parent
+        func_name = None
+        class_name = None
+
+        while current:
+            if current.type == 'function_definition' and not func_name:
+                for child in current.children:
+                    if child.type == 'identifier':
+                        func_name = child.text.decode('utf8')
+                        break
+            elif current.type == 'class_definition' and not class_name:
+                for child in current.children:
+                    if child.type == 'identifier':
+                        class_name = child.text.decode('utf8')
+                        break
+            current = current.parent
+        
+        if class_name and func_name:
+            return f"{class_name}.{func_name}"
+        elif func_name:
+            return func_name
+        elif class_name:
+            return class_name
+        return "global"
 
     def parse_file(self, filepath: str) -> ParsedModule:
         with open(filepath, 'rb') as f:
@@ -26,7 +57,7 @@ class CodeParser:
         tree = self.parser.parse(source_code)
         module = ParsedModule(filepath=filepath)
 
-        # 1. Process Classes and Functions
+        # 1. Classes and Functions (Updated with parent_name)
         struct_cursor = QueryCursor(self.struct_query)
         for match in struct_cursor.matches(tree.root_node):
             captures = match[1]
@@ -35,16 +66,22 @@ class CodeParser:
                     captures["class.name"][0].text.decode('utf8'), 'class', captures["class.def"][0], source_code
                 ))
             elif "func.def" in captures and "func.name" in captures:
-                module.functions.append(self._create_node(
-                    captures["func.name"][0].text.decode('utf8'), 'function', captures["func.def"][0], source_code
-                ))
+                func_node = captures["func.def"][0]
+                # Check if it's inside a class
+                parent_scope = self._get_enclosing_scope(func_node.parent)
+                
+                parsed_node = self._create_node(
+                    captures["func.name"][0].text.decode('utf8'), 'function', func_node, source_code
+                )
+                if parent_scope != "global":
+                    parsed_node.parent_name = parent_scope
 
+                module.functions.append(parsed_node)
 
-# 2. Process Imports (inside core/parser.py -> parse_file)
+        # 2. Imports (Keep your existing import logic here)
         import_cursor = QueryCursor(self.import_query)
         for match in import_cursor.matches(tree.root_node):
             captures = match[1]
-            
             if "import" in captures:
                 for node in captures["import"]:
                     for child in node.children:
@@ -54,11 +91,8 @@ class CodeParser:
                             for c in child.children:
                                 if c.type == 'dotted_name':
                                     module.imports.append(ParsedImport(module=c.text.decode('utf8'), line=node.start_point[0]+1))
-            
             elif "import_from" in captures:
                 for node in captures["import_from"]:
-                    # Robust way to handle relative imports: 
-                    # Find exactly what text sits between the 'from' and 'import' tokens
                     from_idx, import_idx = -1, -1
                     for i, child in enumerate(node.children):
                         if child.type == 'from': from_idx = i
@@ -69,8 +103,7 @@ class CodeParser:
                         parts = [node.children[i].text.decode('utf8') for i in range(from_idx+1, import_idx)]
                         module_name = "".join(parts).strip()
                     
-                    # Extract the specific symbols/names being imported
-                    imported_names =[]
+                    imported_names = []
                     if import_idx != -1:
                         for i in range(import_idx + 1, len(node.children)):
                             child = node.children[i]
@@ -79,14 +112,34 @@ class CodeParser:
 
                     if module_name:
                         module.imports.append(ParsedImport(
-                            module=module_name,
-                            names=imported_names,
-                            line=node.start_point[0]+1
+                            module=module_name, names=imported_names, line=node.start_point[0]+1
                         ))
+
+        # 3. Process Function Calls (NEW)
+        call_cursor = QueryCursor(self.call_query)
+        for match in call_cursor.matches(tree.root_node):
+            captures = match[1]
+            if "call.func" in captures:
+                func_node = captures["call.func"][0]
+                
+                # Extract the name of the function being called
+                callee_name = func_node.text.decode('utf8')
+                
+                # If it's a method call like `self.parser.parse`, extract just `parse`
+                if func_node.type == 'attribute':
+                    callee_name = func_node.child_by_field_name('attribute').text.decode('utf8')
+
+                caller_name = self._get_enclosing_scope(func_node)
+                
+                module.calls.append(ParsedCall(
+                    caller=caller_name,
+                    callee=callee_name,
+                    line=func_node.start_point[0] + 1
+                ))
+
         return module
 
     def _create_node(self, name: str, node_type: str, node, source_code: bytes) -> ParsedNode:
-        # Slice the raw bytes using tree-sitter's byte ranges and decode
         snippet = source_code[node.start_byte:node.end_byte].decode('utf8')
         return ParsedNode(
             name=name, node_type=node_type,

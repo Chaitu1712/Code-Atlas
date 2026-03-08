@@ -1,4 +1,3 @@
-# core/ignore.py
 import os
 import fnmatch
 from pathlib import Path

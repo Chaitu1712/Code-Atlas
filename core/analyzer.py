@@ -1,4 +1,3 @@
-# core/analyzer.py
 import sqlite3
 import networkx as nx
 from typing import Dict, List, Any
@@ -96,6 +95,12 @@ class GraphAnalyzer:
                     self.graph.add_node(resolved_imported_module, type="module_external")
 
             self.graph.add_edge(source_module, resolved_imported_module, symbols=imported_names, type="import")
-
+        # 5. Apply Saved Layout Positions
+        self.cursor.execute("SELECT node_id, fx, fy FROM layout")
+        for node_id, fx, fy in self.cursor.fetchall():
+            if self.graph.has_node(node_id):
+                self.graph.nodes[node_id]['fx'] = fx
+                self.graph.nodes[node_id]['fy'] = fy
+                
     def export_json(self) -> Dict[str, Any]:
         return nx.node_link_data(self.graph)

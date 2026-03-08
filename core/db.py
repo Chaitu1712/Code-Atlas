@@ -7,39 +7,14 @@ class Database:
         self.cursor = self.conn.cursor()
         self._setup_tables()
         
+    # In core/db.py, update _setup_tables:
     def _setup_tables(self):
         self.cursor.executescript("""
-            CREATE TABLE IF NOT EXISTS files (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                filepath TEXT UNIQUE
-            );
-            CREATE TABLE IF NOT EXISTS nodes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                file_id INTEGER,
-                name TEXT,
-                node_type TEXT,
-                parent_name TEXT,     -- <-- NEW COLUMN
-                start_line INTEGER,
-                end_line INTEGER,
-                code_snippet TEXT,
-                FOREIGN KEY(file_id) REFERENCES files(id)
-            );
-            CREATE TABLE IF NOT EXISTS imports (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                file_id INTEGER,
-                imported_module TEXT,
-                imported_names TEXT,
-                line INTEGER,
-                FOREIGN KEY(file_id) REFERENCES files(id)
-            );
-            CREATE TABLE IF NOT EXISTS calls (    -- <-- NEW TABLE
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                file_id INTEGER,
-                caller TEXT,
-                callee TEXT,
-                line INTEGER,
-                FOREIGN KEY(file_id) REFERENCES files(id)
-            );
+            CREATE TABLE IF NOT EXISTS files ( id INTEGER PRIMARY KEY AUTOINCREMENT, filepath TEXT UNIQUE );
+            CREATE TABLE IF NOT EXISTS nodes ( id INTEGER PRIMARY KEY AUTOINCREMENT, file_id INTEGER, name TEXT, node_type TEXT, parent_name TEXT, start_line INTEGER, end_line INTEGER, code_snippet TEXT, FOREIGN KEY(file_id) REFERENCES files(id) );
+            CREATE TABLE IF NOT EXISTS imports ( id INTEGER PRIMARY KEY AUTOINCREMENT, file_id INTEGER, imported_module TEXT, imported_names TEXT, line INTEGER, FOREIGN KEY(file_id) REFERENCES files(id) );
+            CREATE TABLE IF NOT EXISTS calls ( id INTEGER PRIMARY KEY AUTOINCREMENT, file_id INTEGER, caller TEXT, callee TEXT, line INTEGER, FOREIGN KEY(file_id) REFERENCES files(id) );
+            CREATE TABLE IF NOT EXISTS layout (node_id TEXT PRIMARY KEY,fx REAL,fy REAL);
         """)
         self.conn.commit()
 

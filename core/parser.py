@@ -1,4 +1,3 @@
-# core/parser.py
 import tree_sitter_python as tspython
 from tree_sitter import Language, Parser, Query, QueryCursor
 from core.models import ParsedModule, ParsedNode, CodeRange, ParsedImport, ParsedCall

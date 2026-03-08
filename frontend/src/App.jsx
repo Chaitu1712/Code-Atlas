@@ -7,7 +7,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 function App() {
   const [projects, setProjects] = useState([])
   const [currentProject, setCurrentProject] = useState('')
-  const [showAddModal, setShowAddModal] = useState(false) // <-- Modal State
+  const [showAddModal, setShowAddModal] = useState(false)
   
   const [graphData, setGraphData] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -24,7 +24,7 @@ function App() {
       .then(res => res.json())
       .then(data => {
           setProjects(data);
-          if (data.length > 0 && !currentProject) setCurrentProject(data[data.length - 1]); // Auto-select newest
+          if (data.length > 0 && !currentProject) setCurrentProject(data[data.length - 1]); 
       })
   }
 
@@ -93,7 +93,6 @@ function App() {
                 <h1 style={{ margin: 0, color: "#0f172a", fontSize: "24px", fontWeight: 700, letterSpacing: "-0.5px" }}>Code Atlas</h1>
                 <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: "13px", fontWeight: 500 }}>AI Architecture Visualizer</p>
             </div>
-            {/* NEW: ADD PROJECT BUTTON */}
             <button onClick={() => setShowAddModal(true)} style={{ background: "#2563eb", color: "white", border: "none", borderRadius: "8px", width: "32px", height: "32px", fontSize: "20px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
         </div>
 
@@ -103,8 +102,6 @@ function App() {
             </select>
             {projects.length > 0 && <button onClick={handleDeleteProject} style={{ padding: "8px 12px", borderRadius: "8px", border: "1px solid #fecdd3", background: "#fff1f2", color: "#e11d48", cursor: "pointer", fontWeight: "bold" }}>🗑</button>}
         </div>
-
-        {/* ... (Keep Level Toggle, Search Bar, and Search Results EXACTLY as they were) ... */}
         <div style={{ display: "flex", background: "rgba(0, 0, 0, 0.04)", borderRadius: "8px", padding: "4px", marginBottom: "8px" }}>
             {[1, 2, 3].map(level => (
                 <button key={level} onClick={() => setDetailLevel(level)} disabled={!currentProject}
@@ -157,7 +154,7 @@ function App() {
       ) : loading ? (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%", color: "#64748b" }}>Loading architecture...</div>
       ) : (
-        <GraphVisualizer graphData={graphData} searchResults={searchResults} selectedNode={selectedNode} detailLevel={detailLevel} onNodeClick={handleNodeClick} />
+        <GraphVisualizer graphData={graphData} searchResults={searchResults} selectedNode={selectedNode} detailLevel={detailLevel} onNodeClick={handleNodeClick} currentProject={currentProject} />
       )}
     </div>
   )

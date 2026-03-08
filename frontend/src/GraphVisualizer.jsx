@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 
-export default function GraphVisualizer({ graphData, searchResults, selectedNode, detailLevel, onNodeClick }) {
+export default function GraphVisualizer({ graphData, searchResults, selectedNode, detailLevel, onNodeClick, currentProject }) {
     const svgRef = useRef();
     const gRef = useRef();
     const simulationRef = useRef();
@@ -9,6 +9,8 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
     const nodesRef = useRef();
     const linksRef = useRef();
     const labelsRef = useRef();
+
+    const minimapScale = 0.04; 
 
     useEffect(() => {
         if (!graphData || !graphData.nodes.length) return;
@@ -21,9 +23,7 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
 
         const nodeIds = new Set(filteredNodes.map(n => n.id));
         const allLinks = graphData.edges || graphData.links || [];
-        let filteredLinks = allLinks.filter(l => 
-            nodeIds.has(l.source.id || l.source) && nodeIds.has(l.target.id || l.target)
-        );
+        let filteredLinks = allLinks.filter(l => nodeIds.has(l.source.id || l.source) && nodeIds.has(l.target.id || l.target));
 
         const width = window.innerWidth;
         const height = window.innerHeight;
@@ -31,84 +31,163 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
         d3.select(svgRef.current).selectAll("*").remove();
         const svg = d3.select(svgRef.current).attr("width", width).attr("height", height);
 
-        // Grid Background
         const defs = svg.append("defs");
         const pattern = defs.append("pattern").attr("id", "dots").attr("x", 0).attr("y", 0).attr("width", 20).attr("height", 20).attr("patternUnits", "userSpaceOnUse");
         pattern.append("circle").attr("cx", 2).attr("cy", 2).attr("r", 1).attr("fill", "rgba(0,0,0,0.06)");
         svg.append("rect").attr("width", "100%").attr("height", "100%").attr("fill", "url(#dots)");
 
-        // Drop Shadow
         const filter = defs.append("filter").attr("id", "shadow").attr("x", "-20%").attr("y", "-20%").attr("width", "140%").attr("height", "140%");
         filter.append("feDropShadow").attr("dx", "0").attr("dy", "2").attr("stdDeviation", "2").attr("flood-opacity", "0.15");
 
         gRef.current = svg.append("g");
-        const zoom = d3.zoom()
-            .scaleExtent([0.1, 4])
-            .on("zoom", (event) => gRef.current.attr("transform", event.transform));
 
-        svg.call(zoom)
-           .on("dblclick.zoom", null);
+        const minimapSize = 160;
+        const minimapOffset = 24;
+        const minimapContainer = svg.append("g")
+            .attr("transform", `translate(${width - minimapSize - minimapOffset}, ${height - minimapSize - minimapOffset})`);
+        
+        minimapContainer.append("rect")
+            .attr("width", minimapSize).attr("height", minimapSize)
+            .attr("fill", "rgba(255,255,255,0.8)")
+            .attr("stroke", "rgba(0,0,0,0.1)").attr("rx", 12)
+            .style("backdrop-filter", "blur(8px)");
 
-        const edgeColors = { contains: '#cbd5e1', import: '#94a3b8', call_internal: '#ec4899', call_external: '#f97316', default: '#94a3b8' };
+        const minimapContent = minimapContainer.append("g");
+        
+        const minimapViewport = minimapContainer.append("rect")
+            .attr("fill", "rgba(37, 99, 235, 0.1)")
+            .attr("stroke", "#2563eb").attr("stroke-width", 1.5)
+            .attr("rx", 4);
 
-        Object.keys(edgeColors).forEach(type => {
-            defs.append("marker").attr("id", `arrow-${type}`)
-                .attr("viewBox", "-0 -5 10 10").attr("refX", 20).attr("refY", 0) 
-                .attr("orient", "auto").attr("markerWidth", 5).attr("markerHeight", 5)
-                .append("svg:path").attr("d", "M 0,-5 L 10 ,0 L 0,5").attr("fill", edgeColors[type]);
+        const zoom = d3.zoom().scaleExtent([0.1, 4]).on("zoom", (event) => {
+            gRef.current.attr("transform", event.transform);
+            
+            const t = event.transform;
+            minimapViewport
+                .attr("x", (minimapSize / 2) + (-t.x / t.k) * minimapScale)
+                .attr("y", (minimapSize / 2) + (-t.y / t.k) * minimapScale)
+                .attr("width", (width / t.k) * minimapScale)
+                .attr("height", (height / t.k) * minimapScale);
         });
 
-        // Physics Simulation
+        const legendContainer = svg.append("g")
+            .attr("transform", `translate(24, ${height - 280})`); 
+
+        
+        legendContainer.append("rect")
+            .attr("width", 220)
+            .attr("height", 256)
+            .attr("fill", "rgba(255,255,255,0.85)")
+            .attr("stroke", "rgba(0,0,0,0.1)")
+            .attr("rx", 12)
+            .style("backdrop-filter", "blur(8px)");
+
+        
+        legendContainer.append("text")
+            .attr("x", 16).attr("y", 28)
+            .text("Legend")
+            .attr("font-size", "14px").attr("font-weight", "bold")
+            .attr("fill", "#0f172a");
+
+        const legendItems = [
+            { type: 'node', label: 'Package / Folder', color: '#3b82f6', r: 8 },
+            { type: 'node', label: 'Internal Module', color: '#10b981', r: 8 },
+            { type: 'node', label: 'External Library', color: '#64748b', r: 8 },
+            { type: 'node', label: 'Class', color: '#a855f7', r: 6 },
+            { type: 'node', label: 'Function', color: '#f59e0b', r: 4 },
+            { type: 'line', label: 'Contains (Parent/Child)', color: '#cbd5e1', dash: "3,3", width: 1.5 },
+            { type: 'line', label: 'Internal Call', color: '#ec4899', dash: "none", width: 2 },
+            { type: 'line', label: 'External Call', color: '#f97316', dash: "none", width: 2 },
+            { type: 'line', label: 'Import Dependency', color: '#94a3b8', dash: "none", width: 2 }
+        ];
+
+        legendItems.forEach((item, index) => {
+            const yPos = 56 + (index * 22);
+            
+            if (item.type === 'node') {
+                
+                legendContainer.append("circle")
+                    .attr("cx", 24).attr("cy", yPos)
+                    .attr("r", item.r)
+                    .attr("fill", item.color)
+                    .attr("stroke", "#ffffff").attr("stroke-width", 1.5)
+                    .style("filter", "url(#shadow)");
+            } else if (item.type === 'line') {
+                
+                legendContainer.append("line")
+                    .attr("x1", 14).attr("y1", yPos)
+                    .attr("x2", 34).attr("y2", yPos)
+                    .attr("stroke", item.color)
+                    .attr("stroke-width", item.width)
+                    .attr("stroke-dasharray", item.dash);
+            }
+
+            
+            legendContainer.append("text")
+                .attr("x", 44).attr("y", yPos + 4)
+                .text(item.label)
+                .attr("font-size", "11px")
+                .attr("font-weight", "500")
+                .attr("fill", "#475569");
+        });
+
+        svg.call(zoom).on("dblclick.zoom", null);
+
+        const edgeColors = { contains: '#cbd5e1', import: '#94a3b8', call_internal: '#ec4899', call_external: '#f97316', default: '#94a3b8' };
+        Object.keys(edgeColors).forEach(type => {
+            defs.append("marker").attr("id", `arrow-${type}`).attr("viewBox", "-0 -5 10 10").attr("refX", 20).attr("refY", 0).attr("orient", "auto").attr("markerWidth", 5).attr("markerHeight", 5).append("svg:path").attr("d", "M 0,-5 L 10 ,0 L 0,5").attr("fill", edgeColors[type]);
+        });
+
         const simulation = d3.forceSimulation(filteredNodes)
             .force("link", d3.forceLink(filteredLinks).id(d => d.id).distance(d => d.type === 'contains' ? 25 : 75))
             .force("charge", d3.forceManyBody().strength(detailLevel === 3 ? -150 : -300))
             .force("center", d3.forceCenter(width / 2, height / 2))
             .force("collide", d3.forceCollide().radius(detailLevel === 1 ? 30 : 15));
 
-        simulationRef.current = simulation;
-
-        linksRef.current = gRef.current.append("g").selectAll("path")
-            .data(filteredLinks).join("path")
-            .attr("fill", "none")
-            .attr("stroke", d => edgeColors[d.type] || edgeColors.default)
-            .attr("stroke-opacity", d => d.type === 'contains' ? 0.6 : 0.8)
-            .attr("stroke-width", d => d.type === 'contains' ? 1 : 1.5)
-            .attr("stroke-dasharray", d => d.type === 'contains' ? "3,3" : "none")
-            .attr("marker-end", d => `url(#arrow-${d.type || 'default'})`);
+        linksRef.current = gRef.current.append("g").selectAll("path").data(filteredLinks).join("path")
+            .attr("fill", "none").attr("stroke", d => edgeColors[d.type] || edgeColors.default).attr("stroke-opacity", d => d.type === 'contains' ? 0.6 : 0.8).attr("stroke-width", d => d.type === 'contains' ? 1 : 1.5).attr("stroke-dasharray", d => d.type === 'contains' ? "3,3" : "none").attr("marker-end", d => `url(#arrow-${d.type || 'default'})`);
 
         const colorScale = (type) => {
-            if (type === 'module_internal') return '#10b981'; 
-            if (type === 'module_external') return '#64748b'; 
-            if (type === 'package') return '#3b82f6';         
-            if (type === 'class') return '#a855f7';           
-            if (type === 'function') return '#f59e0b';        
-            return '#fff';
+            if (type === 'module_internal') return '#10b981'; if (type === 'module_external') return '#64748b'; 
+            if (type === 'package') return '#3b82f6'; if (type === 'class') return '#a855f7'; 
+            if (type === 'function') return '#f59e0b'; return '#fff';
         };
 
-        nodesRef.current = gRef.current.append("g").selectAll("circle")
-            .data(filteredNodes).join("circle")
-            .attr("r", d => d.type === 'package' || d.type === 'module_internal' ? 12 : d.type === 'class' ? 8 : 5)
-            .attr("fill", d => colorScale(d.type))
-            .attr("stroke", "#ffffff").attr("stroke-width", 2)
-            .style("filter", "url(#shadow)") 
-            .call(drag(simulation))
-            .on('dblclick', (event, d) => {
-                delete d.fx;
-                delete d.fy;
-                simulation.alpha(0.3).restart();
+        
+        const drag = (simulation) => d3.drag()
+            .on("start", event => { if (!event.active) simulation.alphaTarget(0.3).restart(); event.subject.fx = event.subject.x; event.subject.fy = event.subject.y; })
+            .on("drag", event => { event.subject.fx = event.x; event.subject.fy = event.y; })
+            .on("end", event => { 
+                if (!event.active) simulation.alphaTarget(0); 
+                
+                if (currentProject) {
+                    fetch(`http://localhost:8000/api/graph/${currentProject}/layout`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify([{ node_id: event.subject.id, fx: event.subject.fx, fy: event.subject.fy }])
+                    });
+                }
             });
 
-        labelsRef.current = gRef.current.append("g").selectAll("text")
-            .data(filteredNodes).join("text")
-            .attr("dy", d => d.type === 'function' ? -10 : -14)
-            .attr("text-anchor", "middle")
-            .text(d => d.id.split('.').pop())
-            .attr("font-size", d => d.type === 'function' ? "9px" : "11px")
-            .attr("font-weight", d => d.type === 'package' ? "bold" : "600")
-            .attr("fill", "#0f172a")
-            .attr("paint-order", "stroke").attr("stroke", "#ffffff").attr("stroke-width", 3)
-            .attr("stroke-linecap", "round").attr("stroke-linejoin", "round")
-            .attr("pointer-events", "none");
+        nodesRef.current = gRef.current.append("g").selectAll("circle").data(filteredNodes).join("circle")
+            .attr("r", d => d.type === 'package' || d.type === 'module_internal' ? 12 : d.type === 'class' ? 8 : 5)
+            .attr("fill", d => colorScale(d.type)).attr("stroke", "#ffffff").attr("stroke-width", 2).style("filter", "url(#shadow)") 
+            .call(drag(simulation))
+            .on('dblclick', (event, d) => {
+                delete d.fx; delete d.fy; simulation.alpha(0.3).restart();
+                
+                if (currentProject) {
+                    fetch(`http://localhost:8000/api/graph/${currentProject}/layout`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify([{ node_id: d.id, fx: null, fy: null }])
+                    });
+                }
+            });
+
+        labelsRef.current = gRef.current.append("g").selectAll("text").data(filteredNodes).join("text").attr("dy", d => d.type === 'function' ? -10 : -14).attr("text-anchor", "middle").text(d => d.id.split('.').pop()).attr("font-size", d => d.type === 'function' ? "9px" : "11px").attr("font-weight", d => d.type === 'package' ? "bold" : "600").attr("fill", "#0f172a").attr("paint-order", "stroke").attr("stroke", "#ffffff").attr("stroke-width", 3).attr("stroke-linecap", "round").attr("stroke-linejoin", "round").attr("pointer-events", "none");
+
+        
+        const miniNodes = minimapContent.selectAll("circle").data(filteredNodes).join("circle")
+            .attr("r", 1.5).attr("fill", d => colorScale(d.type));
 
         const linkedByIndex = {};
         filteredLinks.forEach(d => { linkedByIndex[`${d.source.id},${d.target.id}`] = true; });
@@ -136,12 +215,19 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
             });
             nodesRef.current.attr("cx", d => d.x).attr("cy", d => d.y);
             labelsRef.current.attr("x", d => d.x).attr("y", d => d.y);
+            
+            
+            miniNodes
+                .attr("cx", d => (minimapSize / 2) + d.x * minimapScale)
+                .attr("cy", d => (minimapSize / 2) + d.y * minimapScale);
         });
+
+        
+        svg.call(zoom.transform, d3.zoomIdentity.translate(width/2, height/2));
 
         return () => simulation.stop();
     }, [graphData, detailLevel]);
 
-    // Search and Selection highlight logic
     useEffect(() => {
         if (!nodesRef.current || !linksRef.current || !labelsRef.current) return;
 
@@ -187,25 +273,5 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
         }
 
     }, [searchResults, selectedNode]);
-
-    // --- UPDATED: Pinned Drag Logic ---
-    const drag = (simulation) => d3.drag()
-        .on("start", event => { 
-            if (!event.active) simulation.alphaTarget(0.3).restart(); 
-            // Lock the node to the mouse position
-            event.subject.fx = event.subject.x; 
-            event.subject.fy = event.subject.y; 
-        })
-        .on("drag", event => { 
-            // Update the locked position as the mouse moves
-            event.subject.fx = event.x; 
-            event.subject.fy = event.y; 
-        })
-        .on("end", event => { 
-            if (!event.active) simulation.alphaTarget(0); 
-            // NOTE: We DO NOT set fx and fy to null here anymore!
-            // This leaves the node "pinned" exactly where you dropped it.
-        });
-
     return <svg ref={svgRef} style={{ background: "#f8fafc", width: "100%", height: "100vh", display: "block" }} />;
 }

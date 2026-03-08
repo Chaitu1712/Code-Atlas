@@ -6,13 +6,11 @@ export default function AddProjectModal({ onClose, onSuccess }) {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     
-    // Progress state
     const [progressStatus, setProgressStatus] = useState('');
     const [progressMessage, setProgressMessage] = useState('');
     const [progressPercent, setProgressPercent] = useState(0);
 
     useEffect(() => {
-        // Connect to WebSocket when modal mounts
         const ws = new WebSocket('ws://localhost:8000/ws/progress');
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
@@ -20,7 +18,7 @@ export default function AddProjectModal({ onClose, onSuccess }) {
             setProgressMessage(data.message);
             setProgressPercent(data.percent);
         };
-        return () => ws.close(); // Cleanup on unmount
+        return () => ws.close();
     }, []);
 
     const handleSubmit = async (e) => {
@@ -33,7 +31,7 @@ export default function AddProjectModal({ onClose, onSuccess }) {
                 body: JSON.stringify({ project_name: name.trim().replace(/\s+/g, '_'), directory: path.trim() })
             });
             if (!res.ok) throw new Error((await res.json()).detail || 'Failed to parse project');
-            setTimeout(() => onSuccess(), 500); // Slight delay so user sees 100%
+            setTimeout(() => onSuccess(), 500);
         } catch (err) {
             setError(err.message);
             setIsLoading(false);
@@ -61,14 +59,11 @@ export default function AddProjectModal({ onClose, onSuccess }) {
                         </div>
                     </form>
                 ) : (
-                    // --- REALTIME PROGRESS UI ---
                     <div style={{ textAlign: 'center', padding: '20px 0' }}>
                         <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a', marginBottom: '8px' }}>{progressStatus || 'Starting...'}</div>
                         <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '20px', height: '15px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{progressMessage}</div>
                         
-                        {/* Progress Bar Track */}
                         <div style={{ width: '100%', background: '#f1f5f9', borderRadius: '8px', height: '10px', overflow: 'hidden' }}>
-                            {/* Animated Fill */}
                             <div style={{ width: `${progressPercent}%`, height: '100%', background: '#2563eb', transition: 'width 0.2s ease-out' }} />
                         </div>
                         <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '8px', fontWeight: 'bold' }}>{progressPercent}%</div>

@@ -1,8 +1,7 @@
-// frontend/src/GraphVisualizer.jsx
 import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 
-export default function GraphVisualizer({ graphData, searchResults, selectedNode, detailLevel, onNodeClick  }) {
+export default function GraphVisualizer({ graphData, searchResults, selectedNode, detailLevel, onNodeClick }) {
     const svgRef = useRef();
     const gRef = useRef();
     const simulationRef = useRef();
@@ -32,36 +31,26 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
         d3.select(svgRef.current).selectAll("*").remove();
         const svg = d3.select(svgRef.current).attr("width", width).attr("height", height);
 
-        // --- Inverted Dot Grid Background ---
+        // Grid Background
         const defs = svg.append("defs");
-        const pattern = defs.append("pattern")
-            .attr("id", "dots")
-            .attr("x", 0).attr("y", 0)
-            .attr("width", 20).attr("height", 20)
-            .attr("patternUnits", "userSpaceOnUse");
-        
-        pattern.append("circle")
-            .attr("cx", 2).attr("cy", 2)
-            .attr("r", 1).attr("fill", "rgba(0,0,0,0.06)"); // Dark dots for light background
+        const pattern = defs.append("pattern").attr("id", "dots").attr("x", 0).attr("y", 0).attr("width", 20).attr("height", 20).attr("patternUnits", "userSpaceOnUse");
+        pattern.append("circle").attr("cx", 2).attr("cy", 2).attr("r", 1).attr("fill", "rgba(0,0,0,0.06)");
+        svg.append("rect").attr("width", "100%").attr("height", "100%").attr("fill", "url(#dots)");
 
-        svg.append("rect")
-            .attr("width", "100%").attr("height", "100%")
-            .attr("fill", "url(#dots)");
-
-        // --- Subtle Drop Shadow ---
+        // Drop Shadow
         const filter = defs.append("filter").attr("id", "shadow").attr("x", "-20%").attr("y", "-20%").attr("width", "140%").attr("height", "140%");
         filter.append("feDropShadow").attr("dx", "0").attr("dy", "2").attr("stdDeviation", "2").attr("flood-opacity", "0.15");
 
         gRef.current = svg.append("g");
-        svg.call(d3.zoom().on("zoom", (event) => gRef.current.attr("transform", event.transform)).scaleExtent([0.1, 4]));
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 4])
+            .on("zoom", (event) => gRef.current.attr("transform", event.transform));
 
-        // Vibrant Colors for Light Background
-        const edgeColors = {
-            contains: '#cbd5e1', import: '#94a3b8', call_internal: '#ec4899', 
-            call_external: '#f97316', default: '#94a3b8'
-        };
+        svg.call(zoom)
+           .on("dblclick.zoom", null);
 
-        // Arrowheads
+        const edgeColors = { contains: '#cbd5e1', import: '#94a3b8', call_internal: '#ec4899', call_external: '#f97316', default: '#94a3b8' };
+
         Object.keys(edgeColors).forEach(type => {
             defs.append("marker").attr("id", `arrow-${type}`)
                 .attr("viewBox", "-0 -5 10 10").attr("refX", 20).attr("refY", 0) 
@@ -69,19 +58,15 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
                 .append("svg:path").attr("d", "M 0,-5 L 10 ,0 L 0,5").attr("fill", edgeColors[type]);
         });
 
-        // --- PHYSICS UPDATE: Half-length connections, tighter packing ---
+        // Physics Simulation
         const simulation = d3.forceSimulation(filteredNodes)
-            // Distance cut in half! (150 -> 75, 50 -> 25)
             .force("link", d3.forceLink(filteredLinks).id(d => d.id).distance(d => d.type === 'contains' ? 25 : 75))
-            // Charge reduced slightly so they don't blow apart from being so close
             .force("charge", d3.forceManyBody().strength(detailLevel === 3 ? -150 : -300))
             .force("center", d3.forceCenter(width / 2, height / 2))
-            // Collision radius reduced to allow tighter packing
             .force("collide", d3.forceCollide().radius(detailLevel === 1 ? 30 : 15));
 
         simulationRef.current = simulation;
 
-        // Draw Links
         linksRef.current = gRef.current.append("g").selectAll("path")
             .data(filteredLinks).join("path")
             .attr("fill", "none")
@@ -91,26 +76,30 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
             .attr("stroke-dasharray", d => d.type === 'contains' ? "3,3" : "none")
             .attr("marker-end", d => `url(#arrow-${d.type || 'default'})`);
 
-        // Node Color Palette (Optimized for white bg)
         const colorScale = (type) => {
-            if (type === 'module_internal') return '#10b981'; // Vibrant Green
-            if (type === 'module_external') return '#64748b'; // Slate
-            if (type === 'package') return '#3b82f6';         // Vivid Blue
-            if (type === 'class') return '#a855f7';           // Vivid Purple
-            if (type === 'function') return '#f59e0b';        // Amber/Orange (Yellow is too hard to see on white)
+            if (type === 'module_internal') return '#10b981'; 
+            if (type === 'module_external') return '#64748b'; 
+            if (type === 'package') return '#3b82f6';         
+            if (type === 'class') return '#a855f7';           
+            if (type === 'function') return '#f59e0b';        
             return '#fff';
         };
 
-        // Draw Nodes
+        // --- UPDATED: Added Double-Click to Unpin ---
         nodesRef.current = gRef.current.append("g").selectAll("circle")
             .data(filteredNodes).join("circle")
             .attr("r", d => d.type === 'package' || d.type === 'module_internal' ? 12 : d.type === 'class' ? 8 : 5)
             .attr("fill", d => colorScale(d.type))
             .attr("stroke", "#ffffff").attr("stroke-width", 2)
             .style("filter", "url(#shadow)") 
-            .call(drag(simulation));
+            .call(drag(simulation))
+            .on('dblclick', (event, d) => {
+                // Remove the fixed coordinates so the physics engine takes back over
+                delete d.fx;
+                delete d.fy;
+                simulation.alpha(0.3).restart(); // Nudge the simulation to snap it back
+            });
 
-        // --- TEXT UPDATE: Dark Text with White Outline ---
         labelsRef.current = gRef.current.append("g").selectAll("text")
             .data(filteredNodes).join("text")
             .attr("dy", d => d.type === 'function' ? -10 : -14)
@@ -118,15 +107,12 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
             .text(d => d.id.split('.').pop())
             .attr("font-size", d => d.type === 'function' ? "9px" : "11px")
             .attr("font-weight", d => d.type === 'package' ? "bold" : "600")
-            .attr("fill", "#0f172a") // Dark text
-            .attr("paint-order", "stroke")
-            .attr("stroke", "#ffffff") // White outline so it perfectly overlays the lines
-            .attr("stroke-width", 3)
-            .attr("stroke-linecap", "round")
-            .attr("stroke-linejoin", "round")
+            .attr("fill", "#0f172a")
+            .attr("paint-order", "stroke").attr("stroke", "#ffffff").attr("stroke-width", 3)
+            .attr("stroke-linecap", "round").attr("stroke-linejoin", "round")
             .attr("pointer-events", "none");
 
-        // Hover Logic
+        // Hover & Click Logic
         const linkedByIndex = {};
         filteredLinks.forEach(d => { linkedByIndex[`${d.source.id},${d.target.id}`] = true; });
 
@@ -140,20 +126,15 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
             nodesRef.current.style('opacity', 1);
             linksRef.current.style('opacity', d => d.type === 'contains' ? 0.6 : 0.8);
             labelsRef.current.style('opacity', 1);
-        }) .on('click', function (event, d) {
-            // Prevent drag from firing click
+        }).on('click', function (event, d) {
             if (event.defaultPrevented) return;
-            onNodeClick(d.id); 
+            if (onNodeClick) onNodeClick(d.id); 
         });
 
         simulation.on("tick", () => {
             linksRef.current.attr("d", d => {
-                if (d.type === 'contains') {
-                    return `M${d.source.x},${d.source.y} L${d.target.x},${d.target.y}`;
-                }
-                const dx = d.target.x - d.source.x,
-                      dy = d.target.y - d.source.y,
-                      dr = Math.sqrt(dx * dx + dy * dy);
+                if (d.type === 'contains') return `M${d.source.x},${d.source.y} L${d.target.x},${d.target.y}`;
+                const dx = d.target.x - d.source.x, dy = d.target.y - d.source.y, dr = Math.sqrt(dx * dx + dy * dy);
                 return `M${d.source.x},${d.source.y}A${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
             });
             nodesRef.current.attr("cx", d => d.x).attr("cy", d => d.y);
@@ -185,7 +166,7 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
                     );
                     return (d.id === targetNode.id || isConnected || d.id === targetNode.parent) ? 1 : 0.1;
                 })
-                .attr('stroke', d => d.id === targetNode.id ? '#2563eb' : '#ffffff') // Highlight stroke is vivid blue
+                .attr('stroke', d => d.id === targetNode.id ? '#2563eb' : '#ffffff')
                 .attr('stroke-width', d => d.id === targetNode.id ? 3 : 2);
 
                 linksRef.current.style('opacity', l => (l.source.id === targetNode.id || l.target.id === targetNode.id) ? 1 : 0.02);
@@ -210,10 +191,24 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
 
     }, [searchResults, selectedNode]);
 
+    // --- UPDATED: Pinned Drag Logic ---
     const drag = (simulation) => d3.drag()
-        .on("start", event => { if (!event.active) simulation.alphaTarget(0.3).restart(); event.subject.fx = event.subject.x; event.subject.fy = event.subject.y; })
-        .on("drag", event => { event.subject.fx = event.x; event.subject.fy = event.y; })
-        .on("end", event => { if (!event.active) simulation.alphaTarget(0); event.subject.fx = null; event.subject.fy = null; });
+        .on("start", event => { 
+            if (!event.active) simulation.alphaTarget(0.3).restart(); 
+            // Lock the node to the mouse position
+            event.subject.fx = event.subject.x; 
+            event.subject.fy = event.subject.y; 
+        })
+        .on("drag", event => { 
+            // Update the locked position as the mouse moves
+            event.subject.fx = event.x; 
+            event.subject.fy = event.y; 
+        })
+        .on("end", event => { 
+            if (!event.active) simulation.alphaTarget(0); 
+            // NOTE: We DO NOT set fx and fy to null here anymore!
+            // This leaves the node "pinned" exactly where you dropped it.
+        });
 
     return <svg ref={svgRef} style={{ background: "#f8fafc", width: "100%", height: "100vh", display: "block" }} />;
 }

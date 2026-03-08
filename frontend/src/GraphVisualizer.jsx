@@ -85,7 +85,6 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
             return '#fff';
         };
 
-        // --- UPDATED: Added Double-Click to Unpin ---
         nodesRef.current = gRef.current.append("g").selectAll("circle")
             .data(filteredNodes).join("circle")
             .attr("r", d => d.type === 'package' || d.type === 'module_internal' ? 12 : d.type === 'class' ? 8 : 5)
@@ -94,10 +93,9 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
             .style("filter", "url(#shadow)") 
             .call(drag(simulation))
             .on('dblclick', (event, d) => {
-                // Remove the fixed coordinates so the physics engine takes back over
                 delete d.fx;
                 delete d.fy;
-                simulation.alpha(0.3).restart(); // Nudge the simulation to snap it back
+                simulation.alpha(0.3).restart();
             });
 
         labelsRef.current = gRef.current.append("g").selectAll("text")
@@ -112,7 +110,6 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
             .attr("stroke-linecap", "round").attr("stroke-linejoin", "round")
             .attr("pointer-events", "none");
 
-        // Hover & Click Logic
         const linkedByIndex = {};
         filteredLinks.forEach(d => { linkedByIndex[`${d.source.id},${d.target.id}`] = true; });
 

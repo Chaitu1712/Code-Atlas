@@ -1,4 +1,3 @@
-# api.py
 from fastapi import FastAPI, Query, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -15,6 +14,7 @@ from core.embeddings import EmbeddingService
 from core.parser import CodeParser
 from core.db import Database
 from core.ignore import GitIgnoreChecker
+from core.git_helper import get_git_authors
 
 app = FastAPI(title="Code Atlas API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -23,7 +23,6 @@ DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
 embedder_cache = {}
 
-# --- NEW: WEBSOCKET MANAGER ---
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
@@ -63,7 +62,6 @@ class LayoutUpdate(BaseModel):
     fx: Optional[float]
     fy: Optional[float]
 
-# --- NEW: Async Parsing with Real-time Progress ---
 @app.post("/api/projects")
 async def add_project(req: ProjectRequest):
     target_dir = Path(req.directory)
@@ -81,25 +79,21 @@ async def add_project(req: ProjectRequest):
     parser = CodeParser()
     ignore_checker = GitIgnoreChecker(str(target_dir))
     
-    # Pre-scan files
     py_files = [f for f in target_dir.rglob("*.py") if not ignore_checker.is_ignored(f)]
     total_files = len(py_files)
     
     try:
         for i, file in enumerate(py_files, 1):
-            # Send WebSocket update
             await ws_manager.broadcast({
                 "status": "Parsing AST...", 
                 "message": f"File {i} of {total_files}: {file.name}",
-                "percent": int((i / total_files) * 60) # 60% of total progress
+                "percent": int((i / total_files) * 60)
             })
             
             try:
                 db.save_module(parser.parse_file(str(file)))
             except Exception:
                 pass
-            
-            # Yield control back to async event loop to ensure WS messages fire
             await asyncio.sleep(0.01) 
     finally:
         db.conn.close()
@@ -111,13 +105,12 @@ async def add_project(req: ProjectRequest):
     embedder = EmbeddingService(str(db_path), str(index_path))
     
     await ws_manager.broadcast({"status": "Vectorizing...", "message": "Generating semantic embeddings...", "percent": 80})
-    await asyncio.to_thread(embedder.generate_embeddings) # Run heavy math in thread so UI doesn't freeze
+    await asyncio.to_thread(embedder.generate_embeddings)
 
     gc.collect()
     await ws_manager.broadcast({"status": "Complete!", "message": "Project is ready.", "percent": 100})
     return {"status": "success", "files_parsed": len(py_files)}
 
-# --- NEW: Layout Persistence Endpoint ---
 @app.post("/api/graph/{project_name}/layout")
 def save_layout(project_name: str, updates: List[LayoutUpdate]):
     db_path = DATA_DIR / project_name / "atlas.db"
@@ -134,7 +127,6 @@ def save_layout(project_name: str, updates: List[LayoutUpdate]):
     conn.close()
     return {"status": "success"}
 
-# ... (Keep ALL your existing GET/DELETE endpoints exactly as they were: list_projects, delete_project, get_graph, search_codebase, get_node_details)
 def get_embedder(project_name: str):
     db_path = DATA_DIR / project_name / "atlas.db"
     index_path = DATA_DIR / project_name / "atlas.index"
@@ -172,16 +164,29 @@ def search_codebase(project_name: str, q: str = Query(...)):
 def get_node_details(project_name: str, node_id: str):
     db_path = DATA_DIR / project_name / "atlas.db"
     node_name = node_id.split('.')[-1]
+    
     conn = sqlite3.connect(str(db_path))
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT n.name, n.node_type, n.start_line, n.end_line, n.code_snippet, f.filepath FROM nodes n JOIN files f ON n.file_id = f.id WHERE n.name = ?", (node_name,))
+        cursor.execute("""
+            SELECT n.name, n.node_type, n.start_line, n.end_line, n.code_snippet, f.filepath
+            FROM nodes n JOIN files f ON n.file_id = f.id WHERE n.name = ?
+        """, (node_name,))
+        
         for row in cursor.fetchall():
             name, node_type, start_line, end_line, snippet, filepath = row
             if filepath.replace(".py", "").replace("\\", ".").replace("/", ".") in node_id:
-                return {"id": node_id, "name": name, "type": node_type, "filepath": filepath, "line_start": start_line, "line_end": end_line, "code": snippet}
-    finally: conn.close()
-    return {"id": node_id, "type": "module/package", "message": "No code snippet."}
+                
+                git_data = get_git_authors(filepath, start_line, end_line)
+                return {
+                    "id": node_id, "name": name, "type": node_type, "filepath": filepath, 
+                    "line_start": start_line, "line_end": end_line, "code": snippet,
+                    "git": git_data
+                }
+    finally:
+        conn.close()
+        
+    return {"id": node_id, "type": "module/package", "message": "No code snippet available."}
 
 if __name__ == "__main__":
     import uvicorn

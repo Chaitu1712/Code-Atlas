@@ -32,13 +32,12 @@ def parse_directory(target_dir: str, db: Database):
         except Exception as e:
             print(f"Failed to parse {file}: {e}")
             
-    print("✅ Parsing complete and saved to database.")
+    print("Parsing complete and saved to database.")
 
 def main():
     parser = argparse.ArgumentParser(description="Code Atlas CLI")
     subparsers = parser.add_subparsers(dest="command")
 
-    # Shared argument for all commands
     for cmd in ["parse", "graph", "embed", "search"]:
         p = subparsers.add_parser(cmd)
         p.add_argument("--project", required=True, help="Name of the project (e.g., my_app)")
@@ -56,11 +55,9 @@ def main():
         parser.print_help()
         return
 
-    # Setup paths based on project name
     db_path, index_path = get_project_paths(args.project)
 
     if args.command == "parse":
-        # Delete old DB if re-parsing to prevent stale data
         if os.path.exists(db_path): os.remove(db_path)
         db = Database(db_path)
         parse_directory(args.directory, db)
@@ -71,11 +68,11 @@ def main():
         
         cycles = analyzer.get_cyclic_dependencies()
         if cycles:
-            print(f"⚠️ Warning: Found {len(cycles)} circular dependencies!")
+            print(f"Warning: Found {len(cycles)} circular dependencies!")
             
         with open(args.out, "w") as f:
             json.dump(analyzer.export_json(), f, indent=4)
-        print(f"✅ Dependency graph saved to {args.out}")
+        print(f"Dependency graph saved to {args.out}")
 
     elif args.command == "embed":
         embedder = EmbeddingService(db_path, index_path)

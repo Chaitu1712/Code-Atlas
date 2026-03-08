@@ -33,7 +33,6 @@ class GraphAnalyzer:
             parent_pkg = ".".join(parts[:i-1]) if i > 1 else None
             if not self.graph.has_node(pkg_name):
                 self.graph.add_node(pkg_name, type="package", parent=parent_pkg)
-            # Add containment edge for packages
             if parent_pkg:
                 self.graph.add_edge(parent_pkg, pkg_name, type="contains")
 
@@ -42,15 +41,13 @@ class GraphAnalyzer:
         files = {row[0]: self._normalize_path(row[1]) for row in self.cursor.fetchall()}
         internal_modules = set(files.values())
 
-        # 1. Add internal files
         for file_id, mod_name in files.items():
             parent = ".".join(mod_name.split(".")[:-1]) if "." in mod_name else None
             self.graph.add_node(mod_name, type="module_internal", parent=parent)
             self._add_packages(mod_name)
-            if parent: # File belongs to a package
+            if parent:
                 self.graph.add_edge(parent, mod_name, type="contains")
 
-        # 2. Add Classes & Functions and CONTAINMENT edges
         self.cursor.execute("SELECT file_id, name, node_type, parent_name FROM nodes")
         nodes_lookup = {}
         
@@ -65,11 +62,9 @@ class GraphAnalyzer:
                 
             self.graph.add_node(node_id, type=node_type, parent=parent_id)
             
-            # Draw line from parent (Class/File) to this node
             self.graph.add_edge(parent_id, node_id, type="contains")
             nodes_lookup[name] = node_id
 
-        # 3. Add Call Edges (Differentiate Internal vs External)
         self.cursor.execute("SELECT file_id, caller, callee FROM calls")
         for file_id, caller, callee in self.cursor.fetchall():
             mod_name = files[file_id]
@@ -77,14 +72,13 @@ class GraphAnalyzer:
             callee_id = nodes_lookup.get(callee)
             
             if callee_id and self.graph.has_node(caller_id) and self.graph.has_node(callee_id):
-                # Check if they share the same parent class/file
+
                 caller_parent = self.graph.nodes[caller_id].get('parent')
                 callee_parent = self.graph.nodes[callee_id].get('parent')
                 
                 edge_type = "call_internal" if caller_parent == callee_parent else "call_external"
                 self.graph.add_edge(caller_id, callee_id, type=edge_type)
 
-        # 4. Process Imports
         self.cursor.execute("SELECT file_id, imported_module, imported_names FROM imports")
         for file_id, imported_module, imported_names in self.cursor.fetchall():
             source_module = files[file_id]
@@ -95,7 +89,7 @@ class GraphAnalyzer:
                     self.graph.add_node(resolved_imported_module, type="module_external")
 
             self.graph.add_edge(source_module, resolved_imported_module, symbols=imported_names, type="import")
-        # 5. Apply Saved Layout Positions
+
         self.cursor.execute("SELECT node_id, fx, fy FROM layout")
         for node_id, fx, fy in self.cursor.fetchall():
             if self.graph.has_node(node_id):

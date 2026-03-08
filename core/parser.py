@@ -16,8 +16,7 @@ class CodeParser:
             (import_statement) @import
             (import_from_statement) @import_from
         """)
-
-        # NEW: Query to find function calls
+        
         self.call_query = Query(self.language, """
             (call function: (_) @call.func)
         """)
@@ -56,7 +55,6 @@ class CodeParser:
         tree = self.parser.parse(source_code)
         module = ParsedModule(filepath=filepath)
 
-        # 1. Classes and Functions (Updated with parent_name)
         struct_cursor = QueryCursor(self.struct_query)
         for match in struct_cursor.matches(tree.root_node):
             captures = match[1]
@@ -66,7 +64,6 @@ class CodeParser:
                 ))
             elif "func.def" in captures and "func.name" in captures:
                 func_node = captures["func.def"][0]
-                # Check if it's inside a class
                 parent_scope = self._get_enclosing_scope(func_node.parent)
                 
                 parsed_node = self._create_node(
@@ -77,7 +74,6 @@ class CodeParser:
 
                 module.functions.append(parsed_node)
 
-        # 2. Imports (Keep your existing import logic here)
         import_cursor = QueryCursor(self.import_query)
         for match in import_cursor.matches(tree.root_node):
             captures = match[1]
@@ -114,17 +110,14 @@ class CodeParser:
                             module=module_name, names=imported_names, line=node.start_point[0]+1
                         ))
 
-        # 3. Process Function Calls (NEW)
         call_cursor = QueryCursor(self.call_query)
         for match in call_cursor.matches(tree.root_node):
             captures = match[1]
             if "call.func" in captures:
                 func_node = captures["call.func"][0]
                 
-                # Extract the name of the function being called
                 callee_name = func_node.text.decode('utf8')
                 
-                # If it's a method call like `self.parser.parse`, extract just `parse`
                 if func_node.type == 'attribute':
                     callee_name = func_node.child_by_field_name('attribute').text.decode('utf8')
 

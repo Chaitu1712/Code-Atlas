@@ -6,8 +6,6 @@ class Database:
         self.conn = sqlite3.connect(db_path)
         self.cursor = self.conn.cursor()
         self._setup_tables()
-        
-    # In core/db.py, update _setup_tables:
     def _setup_tables(self):
         self.cursor.executescript("""
             CREATE TABLE IF NOT EXISTS files ( id INTEGER PRIMARY KEY AUTOINCREMENT, filepath TEXT UNIQUE );
@@ -26,14 +24,12 @@ class Database:
         self.cursor.execute("DELETE FROM imports WHERE file_id = ?", (file_id,))
         self.cursor.execute("DELETE FROM calls WHERE file_id = ?", (file_id,)) # <-- Clear old calls
 
-        # Insert Classes & Functions
         for node in module.classes + module.functions:
             self.cursor.execute("""
                 INSERT INTO nodes (file_id, name, node_type, parent_name, start_line, end_line, code_snippet)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (file_id, node.name, node.node_type, node.parent_name, node.range.start_line, node.range.end_line, node.code_snippet))
 
-        # Insert Imports
         for imp in module.imports:
             names_str = ",".join(imp.names)
             self.cursor.execute("""
@@ -41,7 +37,6 @@ class Database:
                 VALUES (?, ?, ?, ?)
             """, (file_id, imp.module, names_str, imp.line))
 
-        # Insert Calls
         for call in module.calls:
             self.cursor.execute("""
                 INSERT INTO calls (file_id, caller, callee, line)

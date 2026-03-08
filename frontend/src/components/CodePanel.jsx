@@ -1,6 +1,7 @@
 import React from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { IconClose, IconAuthor, IconModifier } from './Icons'; 
 
 export default function CodePanel({ viewingCode, setViewingCode, isCodeLoading }) {
     if (!viewingCode) return null;
@@ -21,15 +22,15 @@ export default function CodePanel({ viewingCode, setViewingCode, isCodeLoading }
                     {viewingCode.git && (
                         <div style={{ marginTop: "10px", display: "flex", gap: "10px", fontSize: "11px" }}>
                             <span style={{ background: "#e0e7ff", color: "#3730a3", padding: "4px 8px", borderRadius: "4px", fontWeight: 500 }}>
-                                ✍️ Original: {viewingCode.git.original}
+                                <IconAuthor /> Original: {viewingCode.git.original}
                             </span>
                             <span style={{ background: "#fce7f3", color: "#9d174d", padding: "4px 8px", borderRadius: "4px", fontWeight: 500 }}>
-                                🔄 Heavy Modifier: {viewingCode.git.heavy}
+                                <IconModifier /> Heavy Modifier: {viewingCode.git.heavy}
                             </span>
                         </div>
                     )}
                 </div>
-                <button onClick={() => setViewingCode(null)} style={{ background: "transparent", border: "none", fontSize: "20px", color: "#94a3b8", cursor: "pointer" }}>✕</button>
+                <button onClick={() => setViewingCode(null)} style={{ background: "transparent", border: "none", fontSize: "20px", color: "#94a3b8", cursor: "pointer" }}><IconClose /></button>
             </div>
             
             <div style={{ padding: "0", flex: 1, overflowY: "auto", background: "#1e1e1e", borderRadius: "0 0 16px 16px" }}>

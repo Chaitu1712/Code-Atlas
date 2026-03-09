@@ -15,6 +15,7 @@ from core.parser import CodeParser
 from core.db import Database
 from core.ignore import GitIgnoreChecker
 from core.git_helper import get_git_authors
+from core.api_linker import APILinker
 
 app = FastAPI(title="Code Atlas API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -79,7 +80,7 @@ async def add_project(req: ProjectRequest):
     parser = CodeParser()
     ignore_checker = GitIgnoreChecker(str(target_dir))
     
-    py_files = [f for f in target_dir.rglob("*.py") if not ignore_checker.is_ignored(f)]
+    py_files = [f for f in target_dir.rglob("*.*") if f.suffix in ['.py', '.ts', '.js', '.jsx', '.tsx'] and not ignore_checker.is_ignored(f)]
     total_files = len(py_files)
     
     try:
@@ -95,6 +96,8 @@ async def add_project(req: ProjectRequest):
             except Exception:
                 pass
             await asyncio.sleep(0.01) 
+        linker = APILinker(str(db_path))
+        linker.run_linkage()
     finally:
         db.conn.close()
 

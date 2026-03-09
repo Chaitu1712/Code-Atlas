@@ -13,7 +13,8 @@ class ParsedNode(BaseModel):
     range: CodeRange
     code_snippet: Optional[str] = None
     parent_name: Optional[str] = None
-    
+    api_endpoint: Optional[str] = None
+     
 class ParsedImport(BaseModel):
     module: str
     names: List[str] =[]
@@ -23,7 +24,7 @@ class ParsedCall(BaseModel):
     caller: str
     callee: str
     line: int
-
+    api_call: Optional[str] = None
 class ParsedModule(BaseModel):
     filepath: str
     classes: List[ParsedNode] = []

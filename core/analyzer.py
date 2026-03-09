@@ -95,6 +95,11 @@ class GraphAnalyzer:
             if self.graph.has_node(node_id):
                 self.graph.nodes[node_id]['fx'] = fx
                 self.graph.nodes[node_id]['fy'] = fy
-                
+        
+        self.cursor.execute("SELECT caller_node_id, endpoint_node_id, path FROM api_edges")
+        for caller_id, endpoint_id, path in self.cursor.fetchall():
+            if self.graph.has_node(caller_id) and self.graph.has_node(endpoint_id):
+                self.graph.add_edge(caller_id, endpoint_id, type="api_call", path=path)
+    
     def export_json(self) -> Dict[str, Any]:
         return nx.node_link_data(self.graph)

@@ -8,11 +8,12 @@ class Database:
         self._setup_tables()
     def _setup_tables(self):
         self.cursor.executescript("""
-            CREATE TABLE IF NOT EXISTS files ( id INTEGER PRIMARY KEY AUTOINCREMENT, filepath TEXT UNIQUE );
-            CREATE TABLE IF NOT EXISTS nodes ( id INTEGER PRIMARY KEY AUTOINCREMENT, file_id INTEGER, name TEXT, node_type TEXT, parent_name TEXT, start_line INTEGER, end_line INTEGER, code_snippet TEXT, FOREIGN KEY(file_id) REFERENCES files(id) );
-            CREATE TABLE IF NOT EXISTS imports ( id INTEGER PRIMARY KEY AUTOINCREMENT, file_id INTEGER, imported_module TEXT, imported_names TEXT, line INTEGER, FOREIGN KEY(file_id) REFERENCES files(id) );
-            CREATE TABLE IF NOT EXISTS calls ( id INTEGER PRIMARY KEY AUTOINCREMENT, file_id INTEGER, caller TEXT, callee TEXT, line INTEGER, FOREIGN KEY(file_id) REFERENCES files(id) );
+            CREATE TABLE IF NOT EXISTS files (id INTEGER PRIMARY KEY AUTOINCREMENT, filepath TEXT UNIQUE );
+            CREATE TABLE IF NOT EXISTS nodes ( id INTEGER PRIMARY KEY AUTOINCREMENT, file_id INTEGER, name TEXT, node_type TEXT, parent_name TEXT, start_line INTEGER, end_line INTEGER, code_snippet TEXT, api_endpoint TEXT, FOREIGN KEY(file_id) REFERENCES files(id) );
+            CREATE TABLE IF NOT EXISTS imports (id INTEGER PRIMARY KEY AUTOINCREMENT, file_id INTEGER, imported_module TEXT, imported_names TEXT, line INTEGER, FOREIGN KEY(file_id) REFERENCES files(id) );
+            CREATE TABLE IF NOT EXISTS calls (id INTEGER PRIMARY KEY AUTOINCREMENT, file_id INTEGER, caller TEXT, callee TEXT, line INTEGER, api_call TEXT, FOREIGN KEY(file_id) REFERENCES files(id) );
             CREATE TABLE IF NOT EXISTS layout (node_id TEXT PRIMARY KEY,fx REAL,fy REAL);
+            CREATE TABLE IF NOT EXISTS api_edges (id INTEGER PRIMARY KEY AUTOINCREMENT, caller_node_id TEXT, endpoint_node_id TEXT, path TEXT);
         """)
         self.conn.commit()
 
@@ -26,9 +27,9 @@ class Database:
 
         for node in module.classes + module.functions:
             self.cursor.execute("""
-                INSERT INTO nodes (file_id, name, node_type, parent_name, start_line, end_line, code_snippet)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (file_id, node.name, node.node_type, node.parent_name, node.range.start_line, node.range.end_line, node.code_snippet))
+                INSERT INTO nodes (file_id, name, node_type, parent_name, start_line, end_line, code_snippet, api_endpoint)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            """, (file_id, node.name, node.node_type, node.parent_name, node.range.start_line, node.range.end_line, node.code_snippet, node.api_endpoint))
 
         for imp in module.imports:
             names_str = ",".join(imp.names)
@@ -39,8 +40,8 @@ class Database:
 
         for call in module.calls:
             self.cursor.execute("""
-                INSERT INTO calls (file_id, caller, callee, line)
-                VALUES (?, ?, ?, ?)
-            """, (file_id, call.caller, call.callee, call.line))
+                INSERT INTO calls (file_id, caller, callee, line, api_call)
+                VALUES (?, ?, ?, ?, ?)
+            """, (file_id, call.caller, call.callee, call.line, call.api_call))
 
         self.conn.commit()

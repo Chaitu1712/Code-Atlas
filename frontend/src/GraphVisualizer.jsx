@@ -133,7 +133,7 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
 
         svg.call(zoom).on("dblclick.zoom", null);
 
-        const edgeColors = { contains: '#cbd5e1', import: '#94a3b8', call_internal: '#ec4899', call_external: '#f97316', default: '#94a3b8' };
+        const edgeColors = { contains: '#cbd5e1', import: '#94a3b8', call_internal: '#ec4899', call_external: '#f97316', default: '#94a3b8', api_call: '#06b6d4'};
         Object.keys(edgeColors).forEach(type => {
             defs.append("marker").attr("id", `arrow-${type}`).attr("viewBox", "-0 -5 10 10").attr("refX", 20).attr("refY", 0).attr("orient", "auto").attr("markerWidth", 5).attr("markerHeight", 5).append("svg:path").attr("d", "M 0,-5 L 10 ,0 L 0,5").attr("fill", edgeColors[type]);
         });
@@ -144,8 +144,7 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
             .force("center", d3.forceCenter(width / 2, height / 2))
             .force("collide", d3.forceCollide().radius(detailLevel === 1 ? 30 : 15));
 
-        linksRef.current = gRef.current.append("g").selectAll("path").data(filteredLinks).join("path")
-            .attr("fill", "none").attr("stroke", d => edgeColors[d.type] || edgeColors.default).attr("stroke-opacity", d => d.type === 'contains' ? 0.6 : 0.8).attr("stroke-width", d => d.type === 'contains' ? 1 : 1.5).attr("stroke-dasharray", d => d.type === 'contains' ? "3,3" : "none").attr("marker-end", d => `url(#arrow-${d.type || 'default'})`);
+        linksRef.current = gRef.current.append("g").selectAll("path").data(filteredLinks).join("path").attr("fill", "none").attr("stroke", d => edgeColors[d.type] || edgeColors.default).attr("stroke-opacity", d => (d.type === 'contains' || d.type === 'api_call') ? 0.6 : 0.8).attr("stroke-width", d => d.type === 'api_call' ? 3 : (d.type === 'contains' ? 1 : 1.5)).attr("stroke-dasharray", d => d.type === 'contains' ? "3,3" : (d.type === 'api_call' ? "8,4" : "none")).attr("marker-end", d => `url(#arrow-${d.type || 'default'})`);
 
         const colorScale = (type) => {
             if (type === 'module_internal') return '#10b981'; if (type === 'module_external') return '#64748b'; 

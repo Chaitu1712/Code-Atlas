@@ -24,14 +24,14 @@ export default function AddProjectModal({ onClose, onSuccess }) {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsLoading(true); setError(''); setProgressPercent(0);
-
+        const formattedName = name.trim().replace(/\s+/g, '_');
         try {
             const res = await fetch('http://localhost:8000/api/projects', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ project_name: name.trim().replace(/\s+/g, '_'), directory: path.trim() })
             });
             if (!res.ok) throw new Error((await res.json()).detail || 'Failed to parse project');
-            setTimeout(() => onSuccess(), 500);
+            setTimeout(() => onSuccess(formattedName), 500); 
         } catch (err) {
             setError(err.message);
             setIsLoading(false);

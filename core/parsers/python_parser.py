@@ -31,7 +31,6 @@ class PythonParser:
         tree = self.parser.parse(source_code)
         module = ParsedModule(filepath=filepath)
 
-        # Classes and Functions
         for match in QueryCursor(self.struct_query).matches(tree.root_node):
             captures = match[1]
             if "class.def" in captures:
@@ -42,15 +41,14 @@ class PythonParser:
                 scope = self._get_enclosing_scope(func_node.parent)
                 if scope != "global": parsed_node.parent_name = scope
                 
-                # --- NEW: Extract API Endpoints (FastAPI/Flask) ---
-                api_match = re.search(r'@(?:app|router)\.(get|post|put|delete|patch)\([\'"]([^\'"]+)[\'"]\)', parsed_node.code_snippet)
+                api_match = re.search(r'@.*?\.(get|post|put|delete|patch)\([\'"]([^\'"]+)[\'"]\)', parsed_node.code_snippet, re.IGNORECASE)
                 if api_match:
                     method, path = api_match.groups()
                     parsed_node.api_endpoint = f"{method.upper()} {path}"
+                    print(f"🟢 [PYTHON EXTRACT] Found Endpoint: {parsed_node.api_endpoint} in {parsed_node.name}")
                 
                 module.functions.append(parsed_node)
 
-        # Imports (Keep identical to old logic)
         for match in QueryCursor(self.import_query).matches(tree.root_node):
             captures = match[1]
             if "import" in captures:
@@ -62,7 +60,6 @@ class PythonParser:
                     parts = [c.text.decode('utf8') for c in node.children if c.type not in ['from', 'import']]
                     if len(parts) >= 1: module.imports.append(ParsedImport(module=parts[0], line=node.start_point[0]+1))
 
-        # Calls
         for match in QueryCursor(self.call_query).matches(tree.root_node):
             if "call.func" in match[1]:
                 func_node = match[1]["call.func"][0]

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import GraphVisualizer from '../GraphVisualizer'; // Assume this is still in src/
+import GraphVisualizer from '../GraphVisualizer';
 import Sidebar from '../components/Sidebar';
 import CodePanel from '../components/CodePanel';
 import CyclesAlert from '../components/CyclesAlert'; 
 
 export default function VisualizerPage() {
-    const { projectName } = useParams(); // Get from URL (/visualize/my_app)
+    const { projectName } = useParams();
     
     const [graphData, setGraphData] = useState(null);
     const [cycles, setCycles] = useState([]);

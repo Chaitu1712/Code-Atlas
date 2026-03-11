@@ -14,9 +14,7 @@ export default function LandingPage() {
             .then(res => res.json())
             .then(data => {
                 setProjects(data);
-                // Load recent from local storage
                 const savedRecents = JSON.parse(localStorage.getItem('codeAtlasRecents') || '[]');
-                // Filter recents to only show projects that still actually exist
                 setRecentProjects(savedRecents.filter(p => data.includes(p)).slice(0, 3));
             });
     };

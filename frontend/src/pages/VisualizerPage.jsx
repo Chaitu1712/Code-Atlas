@@ -3,11 +3,13 @@ import { useParams } from 'react-router-dom';
 import GraphVisualizer from '../GraphVisualizer'; // Assume this is still in src/
 import Sidebar from '../components/Sidebar';
 import CodePanel from '../components/CodePanel';
+import CyclesAlert from '../components/CyclesAlert'; 
 
 export default function VisualizerPage() {
     const { projectName } = useParams(); // Get from URL (/visualize/my_app)
     
     const [graphData, setGraphData] = useState(null);
+    const [cycles, setCycles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
@@ -18,16 +20,16 @@ export default function VisualizerPage() {
     const [isCodeLoading, setIsCodeLoading] = useState(false);
 
     useEffect(() => {
-        // Track as recent
         const recents = JSON.parse(localStorage.getItem('codeAtlasRecents') || '[]');
         const newRecents = [projectName, ...recents.filter(p => p !== projectName)].slice(0, 3);
         localStorage.setItem('codeAtlasRecents', JSON.stringify(newRecents));
 
-        // Fetch Graph
         setLoading(true);
         fetch(`http://localhost:8000/api/graph/${projectName}`)
             .then(res => res.json())
-            .then(data => { setGraphData(data); setLoading(false); })
+            .then(data => { setGraphData(data.graph); 
+                setCycles(data.cycles || []); 
+                setLoading(false);  })
             .catch(() => setLoading(false));
     }, [projectName]);
 
@@ -57,7 +59,7 @@ export default function VisualizerPage() {
                 searchResults={searchResults} selectedNode={selectedNode} setSelectedNode={setSelectedNode}
             />
             <CodePanel viewingCode={viewingCode} setViewingCode={setViewingCode} isCodeLoading={isCodeLoading} />
-            
+            {cycles.length > 0 && <CyclesAlert cycles={cycles} />}
             {loading ? (
                 <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%", color: "#64748b" }}>Loading architecture...</div>
             ) : (

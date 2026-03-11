@@ -38,14 +38,24 @@ export default function Sidebar({
             </form>
 
             {searchResults.length > 0 && (
-                <div style={{ background: "rgba(255,255,255,0.6)", borderRadius: "12px", padding: "12px", border: "1px solid rgba(0,0,0,0.05)", overflowY: "auto", flex: 1 }}>
-                    {searchResults.map((res, i) => (
-                        <div key={i} onClick={() => setSelectedNode(res)} style={{ marginBottom: i !== searchResults.length-1 ? "8px" : "0", padding: "10px", borderRadius: "8px", background: selectedNode?.name === res.name ? "#eff6ff" : "#ffffff", cursor: "pointer", border: selectedNode?.name === res.name ? "1px solid #bfdbfe" : "1px solid #f1f5f9" }}>
-                            <div style={{ color: "#2563eb", fontWeight: 600, fontSize: "13px", display: "flex", justifyContent: "space-between" }}><span>{res.name}</span><span style={{color: "#94a3b8", fontSize: "10px"}}>{res.distance.toFixed(2)}</span></div>
-                            <div style={{ color: "#64748b", fontSize: "11px", marginTop: "4px", fontWeight: 500 }}>{res.type.toUpperCase()}</div>
+            <div style={{ background: "rgba(255,255,255,0.6)", borderRadius: "12px", padding: "12px", border: "1px solid rgba(0,0,0,0.05)", overflowY: "auto", flex: 1 }}>
+                {searchResults.map((res, i) => (
+                    <div key={i} onClick={() => setSelectedNode(res)} style={{ marginBottom: i !== searchResults.length-1 ? "8px" : "0",padding: "10px", borderRadius: "8px",background: selectedNode?.id === res.id ? "#eff6ff" : "#ffffff", cursor: "pointer", border: selectedNode?.id === res.id ? "1px solid #bfdbfe" : "1px solid #f1f5f9" }}>
+                        <div style={{ color: "#2563eb", fontWeight: 600, fontSize: "13px", display: "flex", justifyContent: "space-between" }}>
+                            <span>{res.name}</span>
+                            <span style={{color: "#94a3b8", fontSize: "10px"}}>{"Distance: "+res.distance.toFixed(2)}</span>
                         </div>
-                    ))}
-                </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
+                            <span style={{ color: "#64748b", fontSize: "11px", fontWeight: 500 }}>
+                                {res.type.toUpperCase()}
+                            </span>
+                            <span title={res.filepath} style={{ color: "#94a3b8", fontSize: "10px", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", marginLeft: "10px", textAlign: "right", direction: "rtl" }}>
+                                {res.filepath.split('\\').slice(-2).join('\\')}
+                            </span>
+                        </div>
+                    </div>
+                ))}
+            </div>
             )}
         </div>
     );

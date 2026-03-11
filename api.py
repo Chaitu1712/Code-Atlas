@@ -16,6 +16,7 @@ from core.db import Database
 from core.ignore import GitIgnoreChecker
 from core.git_helper import get_git_authors
 from core.api_linker import APILinker
+from core.strategies.path_normalizer import normalize_path
 
 app = FastAPI(title="Code Atlas API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -114,10 +115,10 @@ async def add_project(req: ProjectRequest):
             except Exception:
                 pass
             await asyncio.sleep(0.01) 
-        linker = APILinker(str(db_path))
-        linker.run_linkage()
     finally:
         db.conn.close()
+    linker = APILinker(str(db_path))
+    linker.run_linkage()
 
     await ws_manager.broadcast({"status": "AI Engine", "message": "Warming up local AI model...", "percent": 65})
     await asyncio.sleep(0.5)
@@ -199,14 +200,17 @@ def get_node_details(project_name: str, node_id: str):
     try:
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT n.name, n.node_type, n.start_line, n.end_line, n.code_snippet, f.filepath
+            SELECT n.name, n.node_type, n.parent_name, n.start_line, n.end_line, n.code_snippet, f.filepath
             FROM nodes n JOIN files f ON n.file_id = f.id WHERE n.name = ?
         """, (node_name,))
         
         for row in cursor.fetchall():
-            name, node_type, start_line, end_line, snippet, filepath = row
-            if filepath.replace(".py", "").replace("\\", ".").replace("/", ".") in node_id:
-                
+            name, node_type, parent_name, start_line, end_line, snippet, filepath = row
+            mod_name = normalize_path(filepath)
+            expected_id = f"{mod_name}.{parent_name}.{name}" if parent_name else f"{mod_name}.{name}"
+            
+            if expected_id == node_id:
+                from core.git_helper import get_git_authors
                 git_data = get_git_authors(filepath, start_line, end_line)
                 return {
                     "id": node_id, "name": name, "type": node_type, "filepath": filepath, 

@@ -138,11 +138,19 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
             defs.append("marker").attr("id", `arrow-${type}`).attr("viewBox", "-0 -5 10 10").attr("refX", 20).attr("refY", 0).attr("orient", "auto").attr("markerWidth", 5).attr("markerHeight", 5).append("svg:path").attr("d", "M 0,-5 L 10 ,0 L 0,5").attr("fill", edgeColors[type]);
         });
 
+        filteredNodes.forEach(n => {
+            if (n.x === undefined || n.y === undefined) {
+                n.x = width / 2 + (Math.random() - 0.5) * 50; // Slight random offset to help collision
+                n.y = height / 2 + (Math.random() - 0.5) * 50;
+            }
+        });
+
         const simulation = d3.forceSimulation(filteredNodes)
-            .force("link", d3.forceLink(filteredLinks).id(d => d.id).distance(d => d.type === 'contains' ? 25 : 75))
-            .force("charge", d3.forceManyBody().strength(detailLevel === 3 ? -150 : -300))
+            .alphaDecay(0.06)
+            .force("link", d3.forceLink(filteredLinks).id(d => d.id).distance(d => d.type === 'contains' ? 40 : 50))
+            .force("charge", d3.forceManyBody().strength(detailLevel === 3 ? -80 : -150))
             .force("center", d3.forceCenter(width / 2, height / 2))
-            .force("collide", d3.forceCollide().radius(detailLevel === 1 ? 30 : 15));
+            .force("collide", d3.forceCollide().radius(detailLevel === 1 ? 40 : 20));
 
         linksRef.current = gRef.current.append("g").selectAll("path").data(filteredLinks).join("path").attr("fill", "none").attr("stroke", d => edgeColors[d.type] || edgeColors.default).attr("stroke-opacity", d => (d.type === 'contains' || d.type === 'api_call') ? 0.6 : 0.8).attr("stroke-width", d => d.type === 'api_call' ? 3 : (d.type === 'contains' ? 1 : 1.5)).attr("stroke-dasharray", d => d.type === 'contains' ? "3,3" : (d.type === 'api_call' ? "8,4" : "none")).attr("marker-end", d => `url(#arrow-${d.type || 'default'})`);
 
@@ -154,11 +162,9 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
 
         
         const drag = (simulation) => d3.drag()
-            .on("start", event => { if (!event.active) simulation.alphaTarget(0.3).restart(); event.subject.fx = event.subject.x; event.subject.fy = event.subject.y; })
-            .on("drag", event => { event.subject.fx = event.x; event.subject.fy = event.y; })
-            .on("end", event => { 
-                if (!event.active) simulation.alphaTarget(0); 
-                
+            .on("start", event => { event.subject.fx = event.subject.x; event.subject.fy = event.subject.y; })
+            .on("drag", event => { if (simulation.alpha() < 0.1) simulation.alpha(0.1).restart(); event.subject.fx = event.x; event.subject.fy = event.y; })
+            .on("end", event => {
                 if (currentProject) {
                     fetch(`http://localhost:8000/api/graph/${currentProject}/layout`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -237,10 +243,11 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
             return;
         }
 
-        const matchedNames = new Set(searchResults.map(r => r.name));
+        const matchedIds = new Set(searchResults.map(r => r.id));
 
         if (selectedNode) {
-            const targetNode = nodesRef.current.data().find(d => d.id.split('.').pop() === selectedNode.name);
+            const targetNode = nodesRef.current.data().find(d => d.id === selectedNode.id);
+            
             if (targetNode) {
                 nodesRef.current.style('opacity', d => {
                     const isConnected = linksRef.current.data().some(l => 
@@ -263,12 +270,12 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
         } 
         else {
             nodesRef.current
-                .style('opacity', d => matchedNames.has(d.id.split('.').pop()) ? 1 : 0.1)
-                .attr('stroke', d => matchedNames.has(d.id.split('.').pop()) ? '#2563eb' : '#ffffff')
-                .attr('stroke-width', d => matchedNames.has(d.id.split('.').pop()) ? 3 : 2);
+                .style('opacity', d => matchedIds.has(d.id) ? 1 : 0.1)
+                .attr('stroke', d => matchedIds.has(d.id) ? '#2563eb' : '#ffffff')
+                .attr('stroke-width', d => matchedIds.has(d.id) ? 3 : 2);
 
             linksRef.current.style('opacity', 0.05);
-            labelsRef.current.style('opacity', d => matchedNames.has(d.id.split('.').pop()) ? 1 : 0.1);
+            labelsRef.current.style('opacity', d => matchedIds.has(d.id) ? 1 : 0.1);
         }
 
     }, [searchResults, selectedNode]);

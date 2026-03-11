@@ -1,4 +1,3 @@
-# core/strategies/import_resolver.py
 from pathlib import Path
 
 def resolve_import(source_filepath: str, source_module: str, imported_module: str, internal_modules: set) -> str:

@@ -48,39 +48,42 @@ class EmbeddingService:
         self.index.add_with_ids(vectors_np, ids_np)
         faiss.write_index(self.index, self.index_path)
         print(f"Successfully saved {len(texts_to_embed)} vectors to {self.index_path}")
+    
     def search(self, query: str, top_k: int = 5) -> list:
-        """Searches the codebase using a natural language query."""
+        import os
+        from core.strategies.path_normalizer import normalize_path # NEW IMPORT
+
         if not os.path.exists(self.index_path) or self.index.ntotal == 0:
-            print("Index is empty or missing. Run 'embed' first.")
-            return[]
+            return []
 
         query_vector = self.model.encode([query]).astype('float32')
-
         distances, indices = self.index.search(query_vector, top_k)
 
-        results =[]
+        results = []
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
         for i, node_id in enumerate(indices[0]):
-            if node_id == -1: 
-                continue
-            
+            if node_id == -1: continue
             cursor.execute("""
-                SELECT n.name, n.node_type, f.filepath, n.start_line
-                FROM nodes n
-                JOIN files f ON n.file_id = f.id
-                WHERE n.id = ?
+                SELECT n.name, n.node_type, n.parent_name, f.filepath, n.start_line
+                FROM nodes n JOIN files f ON n.file_id = f.id WHERE n.id = ?
             """, (int(node_id),))
             
             row = cursor.fetchone()
             if row:
+                name, node_type, parent_name, filepath, start_line = row
+                
+                mod_name = normalize_path(filepath)
+                full_node_id = f"{mod_name}.{parent_name}.{name}" if parent_name else f"{mod_name}.{name}"
+                
                 results.append({
                     "distance": float(distances[0][i]),
-                    "name": row[0],
-                    "type": row[1],
-                    "filepath": row[2],
-                    "line": row[3]
+                    "id": full_node_id,
+                    "name": name,
+                    "type": node_type,
+                    "filepath": filepath,
+                    "line": start_line
                 })
-
+        conn.close()
         return results

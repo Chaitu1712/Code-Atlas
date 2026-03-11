@@ -8,31 +8,52 @@ from core.db import Database
 from core.analyzer import GraphAnalyzer
 from core.embeddings import EmbeddingService
 from core.ignore import GitIgnoreChecker
+from core.api_linker import APILinker
 
 def get_project_paths(project_name: str):
-    """Creates project directory and returns paths for DB and Index."""
     base_dir = Path("data") / project_name
     base_dir.mkdir(parents=True, exist_ok=True)
     return str(base_dir / "atlas.db"), str(base_dir / "atlas.index")
 
-def parse_directory(target_dir: str, db: Database):
+def parse_directory(target_dir: str, db: Database, db_path: str):
     parser = CodeParser()
-    path = Path(target_dir)
-    py_files = list(path.rglob("*.py"))
-    
+    target_path = Path(target_dir)
     ignore_checker = GitIgnoreChecker(target_dir)
-    valid_files = [f for f in py_files if not ignore_checker.is_ignored(f)]
     
-    print(f"Found {len(py_files)} Python files. ({len(py_files) - len(valid_files)} ignored). Parsing {len(valid_files)} files...")
+    valid_files = []
+    valid_extensions = {'.py', '.js', '.jsx', '.ts', '.tsx'}
+    for root, dirs, files in os.walk(target_path):
+        root_path = Path(root)
+        try:
+            rel_root = str(root_path.relative_to(target_path))
+        except ValueError:
+            rel_root = ""
+
+        for i in range(len(dirs) - 1, -1, -1):
+            d = dirs[i]
+            if ignore_checker.is_ignored(d, os.path.join(rel_root, d)):
+                del dirs[i]
+                
+        for f in files:
+            file_path = root_path / f
+            if file_path.suffix in valid_extensions:
+                if not ignore_checker.is_ignored(f, os.path.join(rel_root, f)):
+                    valid_files.append(file_path)
+
+    print(f"Found and parsing {len(valid_files)} source files (Ignored directories aggressively pruned)...")
 
     for file in valid_files:
         try:
-            parsed = parser.parse_file(str(file))
-            db.save_module(parsed)
+            db.save_module(parser.parse_file(str(file)))
         except Exception as e:
             print(f"Failed to parse {file}: {e}")
             
-    print("Parsing complete and saved to database.")
+    print("AST Parsing complete. Running Cross-Language API Linker...")
+    
+    linker = APILinker(db_path)
+    linker.run_linkage()
+    
+    print("API Linkage complete and saved to database.")
 
 def main():
     parser = argparse.ArgumentParser(description="Code Atlas CLI")
@@ -60,7 +81,8 @@ def main():
     if args.command == "parse":
         if os.path.exists(db_path): os.remove(db_path)
         db = Database(db_path)
-        parse_directory(args.directory, db)
+        
+        parse_directory(args.directory, db, db_path) 
 
     elif args.command == "graph":
         analyzer = GraphAnalyzer(db_path)

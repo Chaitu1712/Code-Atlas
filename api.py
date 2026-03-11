@@ -75,12 +75,30 @@ async def add_project(req: ProjectRequest):
     index_path = project_dir / "atlas.index"
 
     if db_path.exists(): os.remove(db_path)
-        
     db = Database(str(db_path))
     parser = CodeParser()
     ignore_checker = GitIgnoreChecker(str(target_dir))
     
-    py_files = [f for f in target_dir.rglob("*.*") if f.suffix in ['.py', '.ts', '.js', '.jsx', '.tsx'] and not ignore_checker.is_ignored(f)]
+    py_files = []
+    valid_extensions = {'.py', '.js', '.jsx', '.ts', '.tsx'}
+    for root, dirs, files in os.walk(target_dir):
+        root_path = Path(root)
+        try:
+            rel_root = str(root_path.relative_to(target_dir))
+        except ValueError:
+            rel_root = ""
+
+        for i in range(len(dirs) - 1, -1, -1):
+            d = dirs[i]
+            if ignore_checker.is_ignored(d, os.path.join(rel_root, d)):
+                del dirs[i]
+                
+        for f in files:
+            file_path = root_path / f
+            if file_path.suffix in valid_extensions:
+                if not ignore_checker.is_ignored(f, os.path.join(rel_root, f)):
+                    py_files.append(file_path)
+
     total_files = len(py_files)
     
     try:
@@ -156,8 +174,17 @@ def get_graph(project_name: str):
     db_path = DATA_DIR / project_name / "atlas.db"
     if not db_path.exists(): raise HTTPException(status_code=404)
     analyzer = GraphAnalyzer(str(db_path))
-    try: analyzer.build_module_graph(); return analyzer.export_json()
-    finally: analyzer.conn.close()
+    try: 
+        analyzer.build_module_graph();
+        graph_data = analyzer.export_json()
+        cycles = analyzer.get_cyclic_dependencies()
+        valid_cycles = [c for c in cycles if len(c) > 1]
+        return {
+            "graph": graph_data,
+            "cycles": valid_cycles
+        }
+    finally: 
+        analyzer.conn.close()
 
 @app.get("/api/search/{project_name}")
 def search_codebase(project_name: str, q: str = Query(...)):

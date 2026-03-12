@@ -9,6 +9,7 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
     const nodesRef = useRef();
     const linksRef = useRef();
     const labelsRef = useRef();
+    const zoomRef = useRef();
 
     const minimapScale = 0.04; 
 
@@ -69,7 +70,7 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
                 .attr("width", (width / t.k) * minimapScale)
                 .attr("height", (height / t.k) * minimapScale);
         });
-
+         zoomRef.current = zoom;
         const legendContainer = svg.append("g")
             .attr("transform", `translate(24, ${height - 280})`); 
 
@@ -249,23 +250,24 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
             const targetNode = nodesRef.current.data().find(d => d.id === selectedNode.id);
             
             if (targetNode) {
-                nodesRef.current.style('opacity', d => {
-                    const isConnected = linksRef.current.data().some(l => 
-                        (l.source.id === targetNode.id && l.target.id === d.id) || (l.target.id === targetNode.id && l.source.id === d.id)
-                    );
-                    return (d.id === targetNode.id || isConnected || d.id === targetNode.parent) ? 1 : 0.1;
-                })
+                 if (zoomRef.current && svgRef.current) {
+                    const scale = 1.5;
+                    const x = (window.innerWidth / 2.5) - (targetNode.x * scale);
+                    const y = (window.innerHeight / 2) - (targetNode.y * scale);
+                    
+                    d3.select(svgRef.current)
+                        .transition().duration(750).ease(d3.easeCubicOut)
+                        .call(zoomRef.current.transform, d3.zoomIdentity.translate(x, y).scale(scale));
+                }
+                nodesRef.current.style('opacity', d => {const isConnected = linksRef.current.data().some(l => (l.source.id === targetNode.id && l.target.id === d.id) || (l.target.id === targetNode.id && l.source.id === d.id));
+                return (d.id === targetNode.id || isConnected || d.id === targetNode.parent) ? 1 : 0.1;})
                 .attr('stroke', d => d.id === targetNode.id ? '#2563eb' : '#ffffff')
                 .attr('stroke-width', d => d.id === targetNode.id ? 3 : 2);
 
                 linksRef.current.style('opacity', l => (l.source.id === targetNode.id || l.target.id === targetNode.id) ? 1 : 0.02);
                 
-                labelsRef.current.style('opacity', d => {
-                    const isConnected = linksRef.current.data().some(l => 
-                        (l.source.id === targetNode.id && l.target.id === d.id) || (l.target.id === targetNode.id && l.source.id === d.id)
-                    );
-                    return (d.id === targetNode.id || isConnected || d.id === targetNode.parent) ? 1 : 0.1;
-                });
+                labelsRef.current.style('opacity', d => {const isConnected = linksRef.current.data().some(l => (l.source.id === targetNode.id && l.target.id === d.id) || (l.target.id === targetNode.id && l.source.id === d.id));
+                return (d.id === targetNode.id || isConnected || d.id === targetNode.parent) ? 1 : 0.1;});
             }
         } 
         else {

@@ -37,7 +37,10 @@ class PythonParser:
                 module.classes.append(self._create_node(captures["class.name"][0].text.decode('utf8'), 'class', captures["class.def"][0], source_code))
             elif "func.def" in captures:
                 func_node = captures["func.def"][0]
-                parsed_node = self._create_node(captures["func.name"][0].text.decode('utf8'), 'function', func_node, source_code)
+                extract_node = func_node
+                if func_node.parent and func_node.parent.type == 'decorated_definition':
+                    extract_node = func_node.parent
+                parsed_node = self._create_node(captures["func.name"][0].text.decode('utf8'), 'function', extract_node, source_code)
                 scope = self._get_enclosing_scope(func_node.parent)
                 if scope != "global": parsed_node.parent_name = scope
                 
@@ -46,6 +49,15 @@ class PythonParser:
                     method, path = api_match.groups()
                     parsed_node.api_endpoint = f"{method.upper()} {path}"
                     print(f"🟢 [PYTHON EXTRACT] Found Endpoint: {parsed_node.api_endpoint} in {parsed_node.name}")
+                consumer_match = re.search(r'(?:requests|httpx|session|client)\.(get|post|put|delete|patch)\([\'"]([^\'"]+)[\'"]\)', parsed_node.code_snippet, re.IGNORECASE)
+                if consumer_match:
+                    method, path = consumer_match.groups()
+                    api_call_str = f"{method.upper()} {path}"
+                    # Add to the calls list
+                    module.calls.append(ParsedCall(
+                        caller=parsed_node.name, callee="API", line=func_node.start_point[0]+1, api_call=api_call_str
+                    ))
+                    print(f"🔵 [PYTHON EXTRACT] Consumer: {api_call_str} in {parsed_node.name}")
                 
                 module.functions.append(parsed_node)
 

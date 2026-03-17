@@ -32,6 +32,13 @@ class TSParser:
                 name = captures["func.name"][0].text.decode('utf8')
                 parsed_node = self._create_node(name, 'function', node, source_code)
                 
+                endpoint_match = re.search(r'(?:app|router|server|@)\.?(get|post|put|delete|patch)\([\'"`]([^\'"`]+)[\'"`]', parsed_node.code_snippet, re.IGNORECASE)
+                if endpoint_match:
+                    method= (endpoint_match.group(1) or 'get').upper()
+                    path = endpoint_match.group(2)
+                    parsed_node.api_endpoint = f"{method.upper()} {path}"
+                    print(f"🟢 [JS/TS EXTRACT] Endpoint: {parsed_node.api_endpoint}")
+                
                 consumer_match = re.search(r'(?:fetch|.*?\.(get|post|put|delete|patch))\([\'"`]([^\'"`]+)[\'"`]', parsed_node.code_snippet, re.IGNORECASE)
                 if consumer_match:
                     method = (consumer_match.group(1) or 'get').upper()
@@ -39,7 +46,7 @@ class TSParser:
                     api_call_str = f"{method} {path}"
                     module.calls.append(ParsedCall(caller=name, callee="API", line=node.start_point[0]+1, api_call=api_call_str))
                     print(f"🔵 [JS/TS EXTRACT] Found Consumer: {api_call_str} in {name}")
-                    
+                
                 module.functions.append(parsed_node)
 
         for match in QueryCursor(self.import_query).matches(tree.root_node):

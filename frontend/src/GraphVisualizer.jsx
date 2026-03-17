@@ -215,6 +215,7 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
 
         simulation.on("tick", () => {
             linksRef.current.attr("d", d => {
+                if (d.source.id === d.target.id) { const x = d.source.x; const y = d.source.y; const r = 20; return `M${x + 5},${y - 5} A${r},${r} 0 1,1 ${x - 5},${y - 5}`;}
                 if (d.type === 'contains') return `M${d.source.x},${d.source.y} L${d.target.x},${d.target.y}`;
                 const dx = d.target.x - d.source.x, dy = d.target.y - d.source.y, dr = Math.sqrt(dx * dx + dy * dy);
                 return `M${d.source.x},${d.source.y}A${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;

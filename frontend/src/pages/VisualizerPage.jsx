@@ -15,7 +15,7 @@ export default function VisualizerPage() {
     const [searchResults, setSearchResults] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
     const [selectedNode, setSelectedNode] = useState(null);
-    const [detailLevel, setDetailLevel] = useState(3);
+    const [detailLevel, setDetailLevel] = useState(2);
     const [viewingCode, setViewingCode] = useState(null);
     const [isCodeLoading, setIsCodeLoading] = useState(false);
 

@@ -39,7 +39,7 @@ class TSParser:
                     parsed_node.api_endpoint = f"{method.upper()} {path}"
                     print(f"🟢 [JS/TS EXTRACT] Endpoint: {parsed_node.api_endpoint}")
                 
-                consumer_match = re.search(r'(?:fetch|.*?\.(get|post|put|delete|patch))\([\'"`]([^\'"`]+)[\'"`]', parsed_node.code_snippet, re.IGNORECASE)
+                consumer_match = re.search(r'(?:fetch|(?:axios|http|api|client|request)\.(get|post|put|delete|patch))\([\'"`]([^\'"`]+)[\'"`]', parsed_node.code_snippet, re.IGNORECASE)
                 if consumer_match:
                     method = (consumer_match.group(1) or 'get').upper()
                     path = consumer_match.group(2)

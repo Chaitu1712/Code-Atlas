@@ -55,7 +55,7 @@ class PythonParser:
                     api_call_str = f"{method.upper()} {path}"
                     # Add to the calls list
                     module.calls.append(ParsedCall(
-                        caller=parsed_node.name, callee="API", line=func_node.start_point[0]+1, api_call=api_call_str
+                        caller=scope, callee="API", line=func_node.start_point[0]+1, api_call=api_call_str
                     ))
                     print(f"🔵 [PYTHON EXTRACT] Consumer: {api_call_str} in {parsed_node.name}")
                 

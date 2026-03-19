@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-
+import { IconClose, IconWarn } from './Icons';
 export default function CyclesAlert({ cycles }) {
     const [isOpen, setIsOpen] = useState(false);
 
@@ -39,13 +39,13 @@ export default function CyclesAlert({ cycles }) {
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
                             <div>
                                 <h2 style={{ margin: 0, color: "#0f172a", fontSize: "20px", display: "flex", alignItems: "center", gap: "8px" }}>
-                                    <span style={{ color: "#e11d48" }}>⚠️</span> Architecture Warning
+                                    <span style={{ color: "#e11d48" }}><IconWarn /></span> Architecture Warning
                                 </h2>
                                 <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: "14px" }}>
                                     Circular imports can cause tight coupling and initialization errors.
                                 </p>
                             </div>
-                            <button onClick={() => setIsOpen(false)} style={{ background: "transparent", border: "none", fontSize: "20px", color: "#94a3b8", cursor: "pointer" }}>✕</button>
+                            <button onClick={() => setIsOpen(false)} style={{ background: "transparent", border: "none", fontSize: "20px", color: "#94a3b8", cursor: "pointer" }}><IconClose size={24}/></button>
                         </div>
 
                         <div style={{ overflowY: "auto", flex: 1, paddingRight: "10px" }}>

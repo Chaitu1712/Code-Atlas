@@ -32,7 +32,7 @@ export default function Sidebar({
             
             <form onSubmit={handleSearch} style={{ display: "flex", gap: "8px", marginBottom: "15px", marginTop: "15px" }}>
                 <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search AI..." style={{ flex: 1, padding: "10px 14px", borderRadius: "8px", border: "1px solid #e2e8f0", background: "#ffffff", outline: "none", fontSize: "13px" }} />
-                <button type="submit" disabled={isSearching} style={{ padding: "10px 16px", borderRadius: "8px", border: "none", fontSize: "13px", fontWeight: 600, background: "linear-gradient(135deg, #2563eb, #1d4ed8)", color: "white", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+                <button type="submit" disabled={isSearching} style={{ padding: "10px 16px", borderRadius: "8px", border: "none", fontSize: "13px", fontWeight: 600, background: "linear-gradient(135deg, #2563eb, #1d4ed8)", color: "white", cursor: "pointer", display: "flex", gap: "8px" }}>
                     <IconSearch /> Find
                 </button>
             </form>

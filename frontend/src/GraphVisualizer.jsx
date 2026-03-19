@@ -77,7 +77,7 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
         
         legendContainer.append("rect")
             .attr("width", 220)
-            .attr("height", 256)
+            .attr("height", 268)
             .attr("fill", "rgba(255,255,255,0.85)")
             .attr("stroke", "rgba(0,0,0,0.1)")
             .attr("rx", 12)
@@ -96,10 +96,11 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
             { type: 'node', label: 'External Library', color: '#64748b', r: 8 },
             { type: 'node', label: 'Class', color: '#a855f7', r: 6 },
             { type: 'node', label: 'Function', color: '#f59e0b', r: 4 },
-            { type: 'line', label: 'Contains (Parent/Child)', color: '#cbd5e1', dash: "3,3", width: 1.5 },
+            { type: 'line', label: 'Contains (Parent/Child)', color: '#8e9092', dash: "3,3", width: 1.5 },
             { type: 'line', label: 'Internal Call', color: '#ec4899', dash: "none", width: 2 },
             { type: 'line', label: 'External Call', color: '#f97316', dash: "none", width: 2 },
-            { type: 'line', label: 'Import Dependency', color: '#94a3b8', dash: "none", width: 2 }
+            { type: 'line', label: 'Import Dependency', color: '#94a3b8', dash: "none", width: 2 },
+            { type: 'line', label: 'API Call', color: '#06b6d4', dash: "3,3", width:2}
         ];
 
         legendItems.forEach((item, index) => {
@@ -134,7 +135,7 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
 
         svg.call(zoom).on("dblclick.zoom", null);
 
-        const edgeColors = { contains: '#cbd5e1', import: '#94a3b8', call_internal: '#ec4899', call_external: '#f97316', default: '#94a3b8', api_call: '#06b6d4'};
+        const edgeColors = { contains: '#8e9092', import: '#94a3b8', call_internal: '#ec4899', call_external: '#f97316', default: '#94a3b8', api_call: '#06b6d4'};
         Object.keys(edgeColors).forEach(type => {
             defs.append("marker").attr("id", `arrow-${type}`).attr("viewBox", "-0 -5 10 10").attr("refX", 20).attr("refY", 0).attr("orient", "auto").attr("markerWidth", 5).attr("markerHeight", 5).append("svg:path").attr("d", "M 0,-5 L 10 ,0 L 0,5").attr("fill", edgeColors[type]);
         });
@@ -215,7 +216,7 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
 
         simulation.on("tick", () => {
             linksRef.current.attr("d", d => {
-                if (d.source.id === d.target.id) { const x = d.source.x; const y = d.source.y; const r = 20; return `M${x + 5},${y - 5} A${r},${r} 0 1,1 ${x - 5},${y - 5}`;}
+                if (d.source.id === d.target.id) { const x = d.source.x; const y = d.source.y;  const cp1x = x + 40; const cp1y = y - 40; const cp2x = x + 40; const cp2y = y + 40; return `M ${x},${y} C ${cp1x},${cp1y} ${cp2x},${cp2y} ${x},${y}`;}
                 if (d.type === 'contains') return `M${d.source.x},${d.source.y} L${d.target.x},${d.target.y}`;
                 const dx = d.target.x - d.source.x, dy = d.target.y - d.source.y, dr = Math.sqrt(dx * dx + dy * dy);
                 return `M${d.source.x},${d.source.y}A${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;

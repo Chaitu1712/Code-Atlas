@@ -21,10 +21,10 @@ export default function CodePanel({ viewingCode, setViewingCode, isCodeLoading }
                     
                     {viewingCode.git && (
                         <div style={{ marginTop: "10px", display: "flex", gap: "10px", fontSize: "11px" }}>
-                            <span style={{ background: "#e0e7ff", color: "#3730a3", padding: "4px 8px", borderRadius: "4px", fontWeight: 500 }}>
+                            <span style={{ background: "#e0e7ff", color: "#3730a3", padding: "4px 8px", borderRadius: "4px", fontWeight: 500, display: "flex", alignItems: "center", gap: "4px" }}>
                                 <IconAuthor /> Original: {viewingCode.git.original}
                             </span>
-                            <span style={{ background: "#fce7f3", color: "#9d174d", padding: "4px 8px", borderRadius: "4px", fontWeight: 500 }}>
+                            <span style={{ background: "#fce7f3", color: "#9d174d", padding: "4px 8px", borderRadius: "4px", fontWeight: 500, display: "flex", alignItems: "center", gap: "4px" }}>
                                 <IconModifier /> Heavy Modifier: {viewingCode.git.heavy}
                             </span>
                         </div>

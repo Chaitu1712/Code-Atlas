@@ -3,7 +3,7 @@ import numpy as np
 import faiss
 from sentence_transformers import SentenceTransformer
 import os
-
+from core.strategies.path_normalizer import normalize_path
 class EmbeddingService:
     def __init__(self, db_path: str = "atlas.db", index_path: str = "atlas.index"):
         self.db_path = db_path
@@ -50,9 +50,6 @@ class EmbeddingService:
         print(f"Successfully saved {len(texts_to_embed)} vectors to {self.index_path}")
     
     def search(self, query: str, top_k: int = 5) -> list:
-        import os
-        from core.strategies.path_normalizer import normalize_path # NEW IMPORT
-
         if not os.path.exists(self.index_path) or self.index.ntotal == 0:
             return []
 

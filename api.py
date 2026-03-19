@@ -1,14 +1,16 @@
-from fastapi import FastAPI, Query, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Query, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+import uvicorn
 from pathlib import Path
-from typing import Optional, List
+from typing import  List
 import sqlite3
 import shutil
 import os
 import gc
 import asyncio
+from fastapi.responses import StreamingResponse
 
+from core.models import ProjectRequest, LayoutUpdate, DownloadRequest, ChatRequest
 from core.analyzer import GraphAnalyzer
 from core.embeddings import EmbeddingService
 from core.parser import CodeParser
@@ -17,6 +19,8 @@ from core.ignore import GitIgnoreChecker
 from core.git_helper import get_git_authors
 from core.api_linker import APILinker
 from core.strategies.path_normalizer import normalize_path
+from core.config import get_config, save_config, is_setup_complete
+from core.llm import CodeAtlasAI
 
 app = FastAPI(title="Code Atlas API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -24,6 +28,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
 embedder_cache = {}
+ai_cache = {}
 
 class ConnectionManager:
     def __init__(self):
@@ -51,18 +56,10 @@ async def websocket_endpoint(websocket: WebSocket):
     await ws_manager.connect(websocket)
     try:
         while True:
-            await websocket.receive_text() # Keep connection alive
+            await websocket.receive_text()
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)
 
-class ProjectRequest(BaseModel):
-    project_name: str
-    directory: str
-
-class LayoutUpdate(BaseModel):
-    node_id: str
-    fx: Optional[float]
-    fy: Optional[float]
 
 @app.post("/api/projects")
 async def add_project(req: ProjectRequest):
@@ -150,11 +147,11 @@ def save_layout(project_name: str, updates: List[LayoutUpdate]):
     return {"status": "success"}
 
 def get_embedder(project_name: str):
-    db_path = DATA_DIR / project_name / "atlas.db"
-    index_path = DATA_DIR / project_name / "atlas.index"
-    if not db_path.exists(): raise HTTPException(status_code=404)
-    if project_name not in embedder_cache: embedder_cache[project_name] = EmbeddingService(str(db_path), str(index_path))
-    else: embedder_cache[project_name].__init__(str(db_path), str(index_path))
+    db_path = str((DATA_DIR / project_name / "atlas.db").resolve())
+    index_path = str((DATA_DIR / project_name / "atlas.index").resolve())
+    if not Path(db_path).exists():  raise HTTPException(status_code=404)
+    if project_name not in embedder_cache: embedder_cache[project_name] = EmbeddingService(db_path, index_path)
+    else: embedder_cache[project_name].__init__(db_path, index_path)
     return embedder_cache[project_name]
 
 @app.get("/api/projects")
@@ -210,7 +207,6 @@ def get_node_details(project_name: str, node_id: str):
             expected_id = f"{mod_name}.{parent_name}.{name}" if parent_name else f"{mod_name}.{name}"
             
             if expected_id == node_id:
-                from core.git_helper import get_git_authors
                 git_data = get_git_authors(filepath, start_line, end_line)
                 return {
                     "id": node_id, "name": name, "type": node_type, "filepath": filepath, 
@@ -222,6 +218,63 @@ def get_node_details(project_name: str, node_id: str):
         
     return {"id": node_id, "type": "module/package", "message": "No code snippet available."}
 
+@app.get("/api/config")
+def read_config():
+    return {"config": get_config(), "is_setup_complete": is_setup_complete()}
+
+@app.post("/api/config")
+def update_config(new_config: dict):
+    current = get_config()
+    current.update(new_config)
+    save_config(current)
+    return {"status": "success"}
+
+@app.post("/api/models/download")
+async def download_model_endpoint(req: DownloadRequest, background_tasks: BackgroundTasks):
+    def download_task():
+        asyncio.run(ws_manager.broadcast({"status": "Downloading Model", "message": f"Downloading {req.filename} from HuggingFace. This may take several minutes...", "percent": 10}))
+        try:
+            ai = CodeAtlasAI("", "")
+            ai.download_model(req.repo_id, req.filename, req.display_name)
+            asyncio.run(ws_manager.broadcast({"status": "Complete!", "message": "Model downloaded successfully.", "percent": 100}))
+        except Exception as e:
+            asyncio.run(ws_manager.broadcast({"status": "Error", "message": str(e), "percent": 0}))
+
+    background_tasks.add_task(download_task)
+    return {"status": "download_started"}
+
+@app.delete("/api/models/{filename}")
+def delete_local_model(filename: str):
+    """Deletes a local model file and removes it from config."""
+    config = get_config()
+    model = next((m for m in config.get("local_models", []) if m["filename"] == filename), None)
+    
+    if not model: raise HTTPException(status_code=404, detail="Model not found in config")
+    
+    path = Path(model["path"])
+    if path.exists():
+        path.unlink()
+        
+    config["local_models"] = [m for m in config["local_models"] if m["filename"] != filename]
+    
+    if config["active_local_model"] == model["path"]:
+        config["active_local_model"] = config["local_models"][0]["path"] if config["local_models"] else ""
+        
+    save_config(config)
+    return {"status": "success"}
+
+@app.post("/api/chat/{project_name}")
+async def chat_endpoint(project_name: str, req: ChatRequest):
+    db_path = str((DATA_DIR / project_name / "atlas.db").resolve())
+    project_dir = str((DATA_DIR / project_name).resolve())
+    if project_name not in ai_cache:
+        ai_cache[project_name] = CodeAtlasAI(db_path, project_dir)
+    ai = ai_cache[project_name]
+    
+    return StreamingResponse(
+        ai.stream_chat(req.node_id, req.message, req.selected_model), 
+        media_type="text/plain"
+    )
+
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

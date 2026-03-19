@@ -25,9 +25,29 @@ class ParsedCall(BaseModel):
     callee: str
     line: int
     api_call: Optional[str] = None
+
 class ParsedModule(BaseModel):
     filepath: str
     classes: List[ParsedNode] = []
     functions: List[ParsedNode] = []
     imports: List[ParsedImport] =[]
     calls: List[ParsedCall] = [] 
+
+class ProjectRequest(BaseModel):
+    project_name: str
+    directory: str
+
+class LayoutUpdate(BaseModel):
+    node_id: str
+    fx: Optional[float]
+    fy: Optional[float]
+    
+class DownloadRequest(BaseModel):
+    repo_id: str
+    filename: str
+    display_name: str 
+
+class ChatRequest(BaseModel):
+    node_id: str
+    message: str
+    selected_model: str 

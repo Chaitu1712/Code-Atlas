@@ -26,9 +26,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-atlas.db
-atlas.index
 .gitignore
 graph.json
 config.json
 models/
+data/
+*.db
+*.index

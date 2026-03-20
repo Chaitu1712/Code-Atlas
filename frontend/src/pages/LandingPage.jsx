@@ -40,7 +40,7 @@ export default function LandingPage() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "40px" }}>
                     
                     <div onClick={() => setShowModal(true)} style={{ background: "#ffffff", border: "1px dashed #cbd5e1", borderRadius: "12px", padding: "30px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s" }} onMouseEnter={e => e.currentTarget.style.borderColor = "#2563eb"} onMouseLeave={e => e.currentTarget.style.borderColor = "#cbd5e1"}>
-                        <div style={{ background: "#eff6ff", padding: "12px", borderRadius: "50%", marginBottom: "15px" }}><IconAdd /></div>
+                        <div style={{ background: "#eff6ff", padding: "12px", borderRadius: "50%", marginBottom: "15px", display:"flex", alignItems: "center"}}><IconAdd /></div>
                         <h3 style={{ margin: 0, color: "#2563eb" }}>Parse New Codebase</h3>
                         <p style={{ color: "#94a3b8", fontSize: "13px", marginTop: "8px", textAlign: "center" }}>Point to a local folder to extract AST & embeddings.</p>
                     </div>

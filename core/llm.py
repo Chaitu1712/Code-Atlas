@@ -16,17 +16,28 @@ class CodeAtlasAI:
 
     def _get_context(self, node_id: str) -> dict:
         node_name = node_id.split('.')[-1]
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT node_type, code_snippet, filepath FROM nodes n JOIN files f ON n.file_id = f.id WHERE n.name = ?", (node_name,))
-        row = cursor.fetchone()
-        if not row: return None
-        node_type, snippet, filepath = row
-        callers = [r[0] for r in cursor.execute("SELECT caller FROM calls WHERE callee = ?", (node_name,)).fetchall()]
-        callees = [r[0] for r in cursor.execute("SELECT callee FROM calls WHERE caller = ?", (node_name,)).fetchall()]
-        conn.close()
-        return { "name": node_id, "type": node_type, "filepath": filepath, "code": snippet, "callers": list(set(callers)), "callees": list(set(callees)) }
-
+        
+        safe_db_path = Path(self.db_path).resolve()
+        if not safe_db_path.exists():
+            print(f"Error: Database not found at {safe_db_path}")
+            return None
+        conn = sqlite3.connect(str(safe_db_path), check_same_thread=False, timeout=10)
+        
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT node_type, code_snippet, filepath FROM nodes n JOIN files f ON n.file_id = f.id WHERE n.name = ?", (node_name,))
+            row = cursor.fetchone()
+            if not row: 
+                return None
+                
+            node_type, snippet, filepath = row
+            callers = [r[0] for r in cursor.execute("SELECT caller FROM calls WHERE callee = ?", (node_name,)).fetchall()]
+            callees = [r[0] for r in cursor.execute("SELECT callee FROM calls WHERE caller = ?", (node_name,)).fetchall()]
+            
+            return { "name": node_id, "type": node_type, "filepath": filepath, "code": snippet, "callers": list(set(callers)), "callees": list(set(callees)) }
+        finally:
+            conn.close()
+            
     def download_model(self, repo_id: str, filename: str, display_name: str):
         """Downloads model and adds it to the list of available local models."""
         models_dir = Path("models")

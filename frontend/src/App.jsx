@@ -4,6 +4,7 @@ import LandingPage from './pages/LandingPage';
 import AllProjectsPage from './pages/AllProjectsPage';
 import VisualizerPage from './pages/VisualizerPage';
 import SetupPage from './pages/SetupPage';
+import SettingsPage from './pages/SettingsPage';
 
 function App() {
   const [isSetup, setIsSetup] = useState(null);
@@ -22,6 +23,7 @@ function App() {
         <Route path="/" element={isSetup ? <LandingPage /> : <Navigate to="/setup" />} />
         <Route path="/projects" element={isSetup ? <AllProjectsPage /> : <Navigate to="/setup" />} />
         <Route path="/visualize/:projectName" element={isSetup ? <VisualizerPage /> : <Navigate to="/setup" />} />
+        <Route path="/settings" element={isSetup ? <SettingsPage /> : <Navigate to="/setup" />} />
       </Routes>
     </Router>
   );

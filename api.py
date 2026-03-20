@@ -160,12 +160,26 @@ def list_projects(): return [d.name for d in DATA_DIR.iterdir() if d.is_dir()]
 @app.delete("/api/projects/{project_name}")
 def delete_project(project_name: str):
     project_dir = DATA_DIR / project_name
-    if project_name in embedder_cache: del embedder_cache[project_name]
+    
+    if project_name in embedder_cache:
+        del embedder_cache[project_name]
+        
+    if project_name in ai_cache:
+        if ai_cache[project_name].local_llm:
+            del ai_cache[project_name].local_llm
+        del ai_cache[project_name]
     gc.collect()
     if project_dir.exists() and project_dir.is_dir():
-        try: shutil.rmtree(project_dir); return {"status": "success"}
-        except PermissionError: raise HTTPException(status_code=409, detail="File locked. Try again.")
-    raise HTTPException(status_code=404)
+        try:
+            shutil.rmtree(project_dir)
+            return {"status": "success", "message": f"Deleted {project_name}"}
+        except PermissionError:
+            raise HTTPException(
+                status_code=409, 
+                detail="Files are currently locked by the OS. Please wait a few seconds and try again."
+            )
+
+    raise HTTPException(status_code=404, detail="Project not found")
 
 @app.get("/api/graph/{project_name}")
 def get_graph(project_name: str):

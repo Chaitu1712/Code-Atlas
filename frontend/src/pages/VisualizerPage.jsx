@@ -58,7 +58,7 @@ export default function VisualizerPage() {
                 query={query} setQuery={setQuery} handleSearch={handleSearch} isSearching={isSearching}
                 searchResults={searchResults} selectedNode={selectedNode} setSelectedNode={setSelectedNode}
             />
-            <CodePanel viewingCode={viewingCode} setViewingCode={setViewingCode} isCodeLoading={isCodeLoading} />
+            <CodePanel viewingCode={viewingCode} setViewingCode={setViewingCode} isCodeLoading={isCodeLoading} currentProject={projectName}  />
             {cycles.length > 0 && <CyclesAlert cycles={cycles} />}
             {loading ? (
                 <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%", color: "#64748b" }}>Loading architecture...</div>

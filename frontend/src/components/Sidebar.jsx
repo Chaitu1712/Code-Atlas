@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { IconHome, IconSearch } from './Icons';
+import { IconHome, IconSearch, IconSettings } from './Icons';
 
 export default function Sidebar({ 
     currentProject, detailLevel, setDetailLevel, query, setQuery, 
@@ -18,9 +18,14 @@ export default function Sidebar({
                     <h1 style={{ margin: 0, color: "#0f172a", fontSize: "24px", fontWeight: 700, letterSpacing: "-0.5px" }}>Code Atlas</h1>
                     <p style={{ margin: "4px 0 0 0", color: "#2563eb", fontSize: "14px", fontWeight: 600 }}>{currentProject}</p>
                 </div>
+                <div style={{ display: "flex", gap: "8px" }}>
+                <Link to="/settings" style={{ background: "#f1f5f9", padding: "8px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", fontSize: "16px" }}>
+                    <IconSettings />
+                </Link>
                 <Link to="/" style={{ background: "#f1f5f9", padding: "8px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>
                     <IconHome />
                 </Link>
+                </div>
             </div>
 
             <div style={{ display: "flex", background: "rgba(0, 0, 0, 0.04)", borderRadius: "8px", padding: "4px", marginBottom: "8px" }}>

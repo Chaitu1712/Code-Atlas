@@ -10,7 +10,7 @@ def get_config():
             "gemini_api_key": "",
             "local_models": [],
             "active_local_model": "",
-            "active_online_model": "gemini-1.5-flash"
+            "active_online_model": "gemini-2.5-flash"
         }
     with open(CONFIG_FILE, "r") as f:
         config = json.load(f)

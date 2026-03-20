@@ -31,3 +31,4 @@ atlas.index
 .gitignore
 graph.json
 config.json
+models/

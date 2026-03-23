@@ -90,7 +90,7 @@ class CodeAtlasAI:
                     if self.local_llm:
                         del self.local_llm # Free RAM
                     
-                    self.local_llm = Llama(model_path=model_path, n_ctx=4096, verbose=False)
+                    self.local_llm = Llama(model_path=model_path, n_ctx=4096,n_gpu_layers=-1,verbose=False)
                     self.current_loaded_model_path = model_path
                 
                 stream = self.local_llm.create_chat_completion(

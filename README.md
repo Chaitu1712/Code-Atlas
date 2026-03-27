@@ -1,9 +1,8 @@
-# 🗺️ Code Atlas
+<img width="1194" height="653" alt="image" src="https://github.com/user-attachments/assets/fc3402aa-9b78-433e-ad89-2100d53f1bcf" /># 🗺️ Code Atlas
 
 **Code Atlas** is a locally-hosted, AI-powered codebase architecture visualizer. It instantly parses your source code into an interactive 3D map, automatically detects cross-language API connections, and allows you to chat with an AI assistant that understands the precise structural context of your codebase.
 
-![Code Atlas Demo](https://via.placeholder.com/1200x600.png?text=Replace+with+a+GIF+of+your+D3+Graph+and+Ask+AI+tab)
-
+![Code Atlas Demo](./assets/demo.gif)
 ## ✨ Key Features
 
 * 🕸️ **Interactive 3D Architecture Map:** Built with D3.js, visualize files, packages, classes, and functions as a physics-simulated, highly navigable force-directed graph.

@@ -2,7 +2,7 @@
 
 **Code Atlas** is a locally-hosted, AI-powered codebase architecture visualizer. It instantly parses your source code into an interactive 3D map, automatically detects cross-language API connections, and allows you to chat with an AI assistant that understands the precise structural context of your codebase.
 
-<img width="1194" height="653" alt="image" src="https://github.com/user-attachments/assets/fc3402aa-9b78-433e-ad89-2100d53f1bcf" />
+<img width="1194" height="653" alt="image" src="[https://github.com/user-attachments/assets/fc3402aa-9b78-433e-ad89-2100d53f1bcf](https://github.com/Chaitu1712/Code-Atlas/blob/6f8e2326c8ad6fba46d7007c2e8e83a774503179/assets/Code_Atlas-Github.gif)" />
 
 ## ✨ Key Features
 

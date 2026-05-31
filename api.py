@@ -264,11 +264,12 @@ def delete_local_model(filename: str):
     model = next((m for m in config.get("local_models", []) if m["filename"] == filename), None)
     
     if not model: raise HTTPException(status_code=404, detail="Model not found in config")
-    
-    path = Path(model["path"])
-    if path.exists():
-        path.unlink()
-        
+    actual_path = Path("models").resolve() / filename
+    if actual_path.exists():   
+        try:
+            actual_path.unlink() # Delete the actual file from the hard drive
+        except PermissionError:
+            raise HTTPException(status_code=409, detail="Model file is locked. Please restart the API server to release RAM.") 
     config["local_models"] = [m for m in config["local_models"] if m["filename"] != filename]
     
     if config["active_local_model"] == model["path"]:

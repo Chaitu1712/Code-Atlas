@@ -124,16 +124,13 @@ class GraphAnalyzer:
         # 6. Inject Cross-Language API Edges
         self.cursor.execute("SELECT caller_node_id, endpoint_node_id, path FROM api_edges")
         edges = self.cursor.fetchall()
-        
-        print(f"[ANALYZER] Attempting to inject {len(edges)} API edges into the graph...")
-        
+
         for caller_id, endpoint_id, path in edges:
             caller_exists = self.graph.has_node(caller_id)
             endpoint_exists = self.graph.has_node(endpoint_id)
             
             if caller_exists and endpoint_exists:
                 self.graph.add_edge(caller_id, endpoint_id, type="api_call", path=path)
-                print(f"[ANALYZER] Successfully injected edge: {caller_id} -> {endpoint_id}")
             else:
                 print(f"[ANALYZER ERROR] Missing Node! Caller '{caller_id}' exists: {caller_exists}. Endpoint '{endpoint_id}' exists: {endpoint_exists}.")
     def get_cyclic_dependencies(self) -> List[List[str]]:

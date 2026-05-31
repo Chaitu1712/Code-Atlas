@@ -79,28 +79,43 @@ class CodeAtlasAI:
                 yield f"\n\n[Gemini Error: {str(e)}]"
                 
         else:
-            model_path = selected_model or self.config.get("active_local_model")
-            if not model_path or not Path(model_path).exists():
-                yield "Error: Local model not found. Switch to Online mode or download a model in Settings."
+            raw_model_path = selected_model or self.config.get("active_local_model")
+            if not raw_model_path:
+                yield "Error: No local model selected. Please download one in Settings."
                 return
-                
+            model_filename = Path(raw_model_path.replace('\\', '/')).name
+            model_path = Path("models").resolve() / model_filename
+            
+            if not model_path.exists():
+                yield f"Error: Local model not found at {model_path}. Switch to Online mode or re-download in Settings."
+                return
+            
             try:
                 # If a different model is selected, or no model is loaded, load it into RAM
-                if not self.local_llm or self.current_loaded_model_path != model_path:
+                if not self.local_llm or self.current_loaded_model_path != str(model_path):
                     if self.local_llm:
                         del self.local_llm # Free RAM
-                    
-                    self.local_llm = Llama(model_path=model_path, n_ctx=4096,n_gpu_layers=-1,verbose=False)
-                    self.current_loaded_model_path = model_path
+                    name_lower = model_filename.lower()
+                    chat_format = None # Let it auto-detect by default
+                    if "phi" in name_lower or "qwen" in name_lower or "mistral" in name_lower:
+                        chat_format = "chatml"
+                    elif "llama-3" in name_lower:
+                        chat_format = "llama-3"
+                            
+                    self.local_llm = Llama(model_path=str(model_path), n_ctx=4096, n_gpu_layers=-1, chat_format=chat_format, verbose=False)
+                    self.current_loaded_model_path = str(model_path)
                 
+                combined_prompt = f"{system_prompt}\n\nUSER QUESTION: {user_message}\n\nPlease answer the user's question based strictly on the provided codebase architecture and code snippet."
+
                 stream = self.local_llm.create_chat_completion(
                     messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_message}
+                        {"role": "user", "content": combined_prompt}
                     ],
                     stream=True,
-                    max_tokens=1024
+                    max_tokens=1024,
+                    temperature=0.3 # Keep it analytical and grounded
                 )
+
                 
                 for chunk in stream:
                     delta = chunk["choices"][0]["delta"]

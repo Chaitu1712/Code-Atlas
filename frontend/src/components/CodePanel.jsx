@@ -157,11 +157,6 @@ export default function CodePanel({ viewingCode, setViewingCode, isCodeLoading, 
                                 style={{ padding: "4px 10px", border: "none", background: mode === 'online' ? "#ffffff" : "transparent", color: mode === 'online' ? "#2563eb" : "#64748b", borderRadius: "4px", fontSize: "11px", fontWeight: "bold", cursor: "pointer", boxShadow: mode === 'online' ? "0 1px 2px rgba(0,0,0,0.05)" : "none" }}>
                                 ☁️ Cloud
                             </button>
-                            <button 
-                                onClick={() => handleConfigChange('offline', config.active_local_model)} 
-                                style={{ padding: "4px 10px", border: "none", background: mode === 'offline' ? "#ffffff" : "transparent", color: mode === 'offline' ? "#10b981" : "#64748b", borderRadius: "4px", fontSize: "11px", fontWeight: "bold", cursor: "pointer", boxShadow: mode === 'offline' ? "0 1px 2px rgba(0,0,0,0.05)" : "none" }}>
-                                🔒 Local
-                            </button>
                         </div>
 
                         {/* Dynamic Model Dropdown */}

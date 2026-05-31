@@ -1,18 +1,12 @@
 import sqlite3
 from pathlib import Path
-from core.config import get_config, save_config
-from huggingface_hub import hf_hub_download
+from core.config import get_config
 from google import genai
-from google.genai import types
-from llama_cpp import Llama
 
 class CodeAtlasAI:
     def __init__(self, db_path: str, project_dir: str):
         self.db_path = db_path
         self.project_dir = Path(project_dir)
-        self.config = get_config()
-        self.local_llm = None
-        self.current_loaded_model_path = None
 
     def _get_context(self, node_id: str) -> dict:
         node_name = node_id.split('.')[-1]
@@ -21,6 +15,7 @@ class CodeAtlasAI:
         if not safe_db_path.exists():
             print(f"Error: Database not found at {safe_db_path}")
             return None
+            
         conn = sqlite3.connect(str(safe_db_path), check_same_thread=False, timeout=10)
         
         try:
@@ -37,23 +32,6 @@ class CodeAtlasAI:
             return { "name": node_id, "type": node_type, "filepath": filepath, "code": snippet, "callers": list(set(callers)), "callees": list(set(callees)) }
         finally:
             conn.close()
-            
-    def download_model(self, repo_id: str, filename: str, display_name: str):
-        """Downloads model and adds it to the list of available local models."""
-        models_dir = Path("models")
-        models_dir.mkdir(exist_ok=True)
-        
-        downloaded_path = hf_hub_download(repo_id=repo_id, filename=filename, local_dir=str(models_dir), local_dir_use_symlinks=False)
-        
-        self.config = get_config()
-        new_model = {"name": display_name or filename, "path": downloaded_path, "repo": repo_id, "filename": filename}
-
-        self.config["local_models"] = [m for m in self.config.get("local_models", []) if m["path"] != downloaded_path]
-        self.config["local_models"].append(new_model)
-        self.config["active_local_model"] = downloaded_path
-        
-        save_config(self.config)
-        return downloaded_path
 
     async def stream_chat(self, node_id: str, user_message: str, selected_model: str):
         context = self._get_context(node_id)
@@ -61,65 +39,27 @@ class CodeAtlasAI:
             yield "Error: Could not find code context for this node."
             return
 
-        self.config = get_config()
+        # Always fetch fresh config
+        config = get_config()
+        
+        if not config.get("gemini_api_key"):
+            yield "Error: Gemini API Key is missing. Please update it in Settings."
+            return
+
         system_prompt = f"You are Code Atlas, a Staff Software Architect. You are analyzing {context['name']} ({context['filepath']}).\nIt is called by: {', '.join(context['callers']) or 'None'}\nIt calls: {', '.join(context['callees']) or 'None'}\n\nCODE:\n```\n{context['code']}\n```"
 
-        if self.config["mode"] == "online":
-            if not self.config.get("gemini_api_key"):
-                yield "Error: Gemini API Key is missing. Switch to Offline mode or update Settings."
-                return
+        try:
+            client = genai.Client(api_key=config["gemini_api_key"])
+            model_name = selected_model or config.get("active_online_model", "gemini-2.5-flash")
             
-            try:
-                client = genai.Client(api_key=self.config["gemini_api_key"])
-                model=selected_model or self.config["active_online_model"]
-                response = client.models.generate_content_stream(model=model, contents=f"{system_prompt}\n\nUSER QUESTION: {user_message}")
-                for chunk in response:
-                    if chunk.text: yield chunk.text
-            except Exception as e:
-                yield f"\n\n[Gemini Error: {str(e)}]"
-                
-        else:
-            raw_model_path = selected_model or self.config.get("active_local_model")
-            if not raw_model_path:
-                yield "Error: No local model selected. Please download one in Settings."
-                return
-            model_filename = Path(raw_model_path.replace('\\', '/')).name
-            model_path = Path("models").resolve() / model_filename
+            response = client.models.generate_content_stream(
+                model=model_name, 
+                contents=f"{system_prompt}\n\nUSER QUESTION: {user_message}"
+            )
             
-            if not model_path.exists():
-                yield f"Error: Local model not found at {model_path}. Switch to Online mode or re-download in Settings."
-                return
-            
-            try:
-                # If a different model is selected, or no model is loaded, load it into RAM
-                if not self.local_llm or self.current_loaded_model_path != str(model_path):
-                    if self.local_llm:
-                        del self.local_llm # Free RAM
-                    name_lower = model_filename.lower()
-                    chat_format = None # Let it auto-detect by default
-                    if "phi" in name_lower or "qwen" in name_lower or "mistral" in name_lower:
-                        chat_format = "chatml"
-                    elif "llama-3" in name_lower:
-                        chat_format = "llama-3"
-                            
-                    self.local_llm = Llama(model_path=str(model_path), n_ctx=4096, n_gpu_layers=-1, chat_format=chat_format, verbose=False)
-                    self.current_loaded_model_path = str(model_path)
-                
-                combined_prompt = f"{system_prompt}\n\nUSER QUESTION: {user_message}\n\nPlease answer the user's question based strictly on the provided codebase architecture and code snippet."
-
-                stream = self.local_llm.create_chat_completion(
-                    messages=[
-                        {"role": "user", "content": combined_prompt}
-                    ],
-                    stream=True,
-                    max_tokens=1024,
-                    temperature=0.3 # Keep it analytical and grounded
-                )
-
-                
-                for chunk in stream:
-                    delta = chunk["choices"][0]["delta"]
-                    if "content" in delta:
-                        yield delta["content"]
-            except Exception as e:
-                yield f"\n\n[Local AI Error: {str(e)}]"
+            for chunk in response:
+                if chunk.text: 
+                    yield chunk.text
+                    
+        except Exception as e:
+            yield f"\n\n[Gemini Error: {str(e)}]"

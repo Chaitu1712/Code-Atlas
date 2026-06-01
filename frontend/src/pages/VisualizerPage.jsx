@@ -25,7 +25,7 @@ export default function VisualizerPage() {
         localStorage.setItem('codeAtlasRecents', JSON.stringify(newRecents));
 
         setLoading(true);
-        fetch(`http://localhost:8000/api/graph/${projectName}`)
+        fetch(import.meta.env.VITE_API_URL + `/api/graph/${projectName}`)
             .then(res => res.json())
             .then(data => { setGraphData(data.graph); 
                 setCycles(data.cycles || []); 
@@ -38,7 +38,7 @@ export default function VisualizerPage() {
         if (!query.trim()) { setQuery(''); setSearchResults([]); setSelectedNode(null); return; }
         setIsSearching(true); setSelectedNode(null); setViewingCode(null);
         try {
-            const res = await fetch(`http://localhost:8000/api/search/${projectName}?q=${encodeURIComponent(query)}`);
+            const res = await fetch(import.meta.env.VITE_API_URL + `/api/search/${projectName}?q=${encodeURIComponent(query)}`);
             setSearchResults((await res.json()).results || []);
         } finally { setIsSearching(false); }
     };
@@ -46,7 +46,7 @@ export default function VisualizerPage() {
     const handleNodeClick = async (nodeId) => {
         setIsCodeLoading(true);
         try {
-            const res = await fetch(`http://localhost:8000/api/node/${projectName}/${encodeURIComponent(nodeId)}`);
+            const res = await fetch(import.meta.env.VITE_API_URL + `/api/node/${projectName}/${encodeURIComponent(nodeId)}`);
             setViewingCode(await res.json());
         } finally { setIsCodeLoading(false); }
     };

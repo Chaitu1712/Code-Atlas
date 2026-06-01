@@ -13,7 +13,9 @@ export default function AddProjectModal({ onClose, onSuccess }) {
 
     // 1. Connect to WebSocket
     useEffect(() => {
-        const ws = new WebSocket('ws://localhost:8000/ws/progress');
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        const wsUrl = apiUrl.replace(/^http/, 'ws') + '/ws/progress';
+        const ws = new WebSocket(wsUrl);
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
             setProgressStatus(data.status);

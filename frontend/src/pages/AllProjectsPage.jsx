@@ -12,7 +12,7 @@ export default function AllProjectsPage() {
     const handleDelete = async (e, p) => {
         e.stopPropagation();
         if (window.confirm(`Delete data for "${p}"?`)) {
-            await fetch(`http://localhost:8000/api/projects/${p}`, { method: 'DELETE' });
+            await fetch(import.meta.env.VITE_API_URL + `/api/projects/${p}`, { method: 'DELETE' });
             fetchProjects();
         }
     };

@@ -168,7 +168,7 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
             .on("drag", event => { if (simulation.alpha() < 0.1) simulation.alpha(0.1).restart(); event.subject.fx = event.x; event.subject.fy = event.y; })
             .on("end", event => {
                 if (currentProject) {
-                    fetch(`http://localhost:8000/api/graph/${currentProject}/layout`, {
+                    fetch(import.meta.env.VITE_API_URL + `/api/graph/${currentProject}/layout`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify([{ node_id: event.subject.id, fx: event.subject.fx, fy: event.subject.fy }])
                     });
@@ -183,7 +183,7 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
                 delete d.fx; delete d.fy; simulation.alpha(0.3).restart();
                 
                 if (currentProject) {
-                    fetch(`http://localhost:8000/api/graph/${currentProject}/layout`, {
+                    fetch(import.meta.env.VITE_API_URL + `/api/graph/${currentProject}/layout`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify([{ node_id: d.id, fx: null, fy: null }])
                     });

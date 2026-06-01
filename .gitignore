@@ -34,3 +34,5 @@ models/
 data/
 *.db
 *.index
+
+.env

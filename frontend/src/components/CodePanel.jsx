@@ -20,7 +20,7 @@ export default function CodePanel({ viewingCode, setViewingCode, isCodeLoading, 
 
     // 1. Fetch config on mount
     useEffect(() => {
-        fetch('http://localhost:8000/api/config')
+        fetch(import.meta.env.VITE_API_URL + '/api/config')
             .then(res => res.json())
             .then(data => {
                 setConfig(data.config);
@@ -39,14 +39,14 @@ export default function CodePanel({ viewingCode, setViewingCode, isCodeLoading, 
         if (newMode === 'online') updates.active_online_model = newModel;
         else updates.active_local_model = newModel;
 
-        await fetch('http://localhost:8000/api/config', {
+        await fetch(import.meta.env.VITE_API_URL + '/api/config', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updates)
         });
         
         // Refresh local config state
-        const res = await fetch('http://localhost:8000/api/config');
+        const res = await fetch(import.meta.env.VITE_API_URL + '/api/config');
         const data = await res.json();
         setConfig(data.config);
     };

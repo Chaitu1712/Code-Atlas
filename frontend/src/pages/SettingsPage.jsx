@@ -8,7 +8,7 @@ export default function SettingsPage() {
 
 
     const fetchConfig = () => {
-        fetch('http://localhost:8000/api/config')
+        fetch(import.meta.env.VITE_API_URL + '/api/config')
             .then(res => res.json())
             .then(data => {
                 setConfig(data.config);
@@ -19,7 +19,7 @@ export default function SettingsPage() {
     useEffect(() => { fetchConfig(); }, []);
 
     const saveApiKey = async () => {
-        await fetch('http://localhost:8000/api/config', {
+        await fetch(import.meta.env.VITE_API_URL + '/api/config', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ gemini_api_key: geminiKey })
         });

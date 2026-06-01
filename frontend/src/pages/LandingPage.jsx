@@ -10,7 +10,7 @@ export default function LandingPage() {
     const navigate = useNavigate();
 
     const fetchProjects = () => {
-        fetch('http://localhost:8000/api/projects')
+        fetch(import.meta.env.VITE_API_URL + '/api/projects')
             .then(res => res.json())
             .then(data => {
                 setProjects(data);

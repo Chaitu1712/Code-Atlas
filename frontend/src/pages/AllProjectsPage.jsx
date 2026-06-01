@@ -6,7 +6,7 @@ export default function AllProjectsPage() {
     const [projects, setProjects] = useState([]);
     const navigate = useNavigate();
 
-    const fetchProjects = () => fetch('http://localhost:8000/api/projects').then(res => res.json()).then(setProjects);
+    const fetchProjects = () => fetch(import.meta.env.VITE_API_URL + '/api/projects').then(res => res.json()).then(setProjects);
     useEffect(() => { fetchProjects(); }, []);
 
     const handleDelete = async (e, p) => {

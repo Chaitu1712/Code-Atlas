@@ -10,7 +10,7 @@ function App() {
   const [isSetup, setIsSetup] = useState(null);
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/config')
+    fetch(import.meta.env.VITE_API_URL + '/api/config')
         .then(res => res.json())
         .then(data => setIsSetup(data.is_setup_complete));
   }, []);

@@ -49,7 +49,7 @@ export default function AddProjectModal({ onClose, onSuccess }) {
         setExtractedRepoName(repoName);
 
         try {
-            const res = await fetch('http://localhost:8000/api/projects/github', {
+            const res = await fetch(import.meta.env.VITE_API_URL + '/api/projects/github', {
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ github_url: cleanUrl })

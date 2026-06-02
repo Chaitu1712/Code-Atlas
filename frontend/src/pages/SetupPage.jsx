@@ -1,24 +1,35 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-export default function SetupPage() {
+export default function SetupPage({ authFetch }) {
     const [mode, setMode] = useState('online');
     const [geminiKey, setGeminiKey] = useState('');
-    
     const [isSaving, setIsSaving] = useState(false);
-    const navigate = useNavigate();
-
 
     const handleSetup = async (e) => {
         e.preventDefault();
         setIsSaving(true);
-        setMode('online');
-        await fetch(import.meta.env.VITE_API_URL + '/api/config', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mode, gemini_api_key: geminiKey })
-        });
         
-        window.location.href = '/';
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        
+        try {
+            const res = await authFetch(`${apiUrl}/api/config`, {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode, gemini_api_key: geminiKey })
+            });
+
+            if (!res.ok) {
+                throw new Error("Failed to save configuration");
+            }
+            
+            // Hard reload so App.jsx re-fetches the config and routes to Landing Page
+            window.location.href = '/';
+            
+        } catch (err) {
+            alert(err.message);
+            setIsSaving(false);
+        }
     };
 
     return (

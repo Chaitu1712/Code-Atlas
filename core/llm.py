@@ -4,9 +4,10 @@ from core.config import get_config
 from google import genai
 
 class CodeAtlasAI:
-    def __init__(self, db_path: str, project_dir: str):
+    def __init__(self, db_path: str, project_dir: str, username: str):
         self.db_path = db_path
         self.project_dir = Path(project_dir)
+        self.username = username
 
     def _get_context(self, node_id: str) -> dict:
         node_name = node_id.split('.')[-1]
@@ -40,7 +41,7 @@ class CodeAtlasAI:
             return
 
         # Always fetch fresh config
-        config = get_config()
+        config = get_config(self.username)
         
         if not config.get("gemini_api_key"):
             yield "Error: Gemini API Key is missing. Please update it in Settings."

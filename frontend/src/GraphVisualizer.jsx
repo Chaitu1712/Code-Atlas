@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 
-export default function GraphVisualizer({ graphData, searchResults, selectedNode, detailLevel, onNodeClick, currentProject }) {
+export default function GraphVisualizer({ graphData, searchResults, selectedNode, detailLevel, onNodeClick, currentProject, authFetch }) {
     const svgRef = useRef();
     const gRef = useRef();
     const simulationRef = useRef();
@@ -167,8 +167,9 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
             .on("start", event => { event.subject.fx = event.subject.x; event.subject.fy = event.subject.y; })
             .on("drag", event => { if (simulation.alpha() < 0.1) simulation.alpha(0.1).restart(); event.subject.fx = event.x; event.subject.fy = event.y; })
             .on("end", event => {
+                const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
                 if (currentProject) {
-                    fetch(import.meta.env.VITE_API_URL + `/api/graph/${currentProject}/layout`, {
+                    authFetch(`${apiUrl}/api/graph/${currentProject}/layout`,  {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify([{ node_id: event.subject.id, fx: event.subject.fx, fy: event.subject.fy }])
                     });
@@ -183,7 +184,7 @@ export default function GraphVisualizer({ graphData, searchResults, selectedNode
                 delete d.fx; delete d.fy; simulation.alpha(0.3).restart();
                 
                 if (currentProject) {
-                    fetch(import.meta.env.VITE_API_URL + `/api/graph/${currentProject}/layout`, {
+                    authFetch(`${apiUrl}/api/graph/${currentProject}/layout`,  {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify([{ node_id: d.id, fx: null, fy: null }])
                     });

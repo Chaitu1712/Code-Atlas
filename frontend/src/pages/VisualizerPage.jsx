@@ -5,9 +5,9 @@ import Sidebar from '../components/Sidebar';
 import CodePanel from '../components/CodePanel';
 import CyclesAlert from '../components/CyclesAlert'; 
 
-export default function VisualizerPage() {
+export default function VisualizerPage({ authFetch }) {
     const { projectName } = useParams();
-    
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
     const [graphData, setGraphData] = useState(null);
     const [cycles, setCycles] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -25,7 +25,7 @@ export default function VisualizerPage() {
         localStorage.setItem('codeAtlasRecents', JSON.stringify(newRecents));
 
         setLoading(true);
-        fetch(import.meta.env.VITE_API_URL + `/api/graph/${projectName}`)
+        authFetch(`${apiUrl}/api/graph/${projectName}`)
             .then(res => res.json())
             .then(data => { setGraphData(data.graph); 
                 setCycles(data.cycles || []); 
@@ -38,7 +38,7 @@ export default function VisualizerPage() {
         if (!query.trim()) { setQuery(''); setSearchResults([]); setSelectedNode(null); return; }
         setIsSearching(true); setSelectedNode(null); setViewingCode(null);
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + `/api/search/${projectName}?q=${encodeURIComponent(query)}`);
+            const res = await authFetch(`${apiUrl}/api/search/${projectName}?q=${encodeURIComponent(query)}`);
             setSearchResults((await res.json()).results || []);
         } finally { setIsSearching(false); }
     };
@@ -46,7 +46,7 @@ export default function VisualizerPage() {
     const handleNodeClick = async (nodeId) => {
         setIsCodeLoading(true);
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + `/api/node/${projectName}/${encodeURIComponent(nodeId)}`);
+            const res = await authFetch(`${apiUrl}/api/node/${projectName}/${encodeURIComponent(nodeId)}`);
             setViewingCode(await res.json());
         } finally { setIsCodeLoading(false); }
     };
@@ -58,12 +58,12 @@ export default function VisualizerPage() {
                 query={query} setQuery={setQuery} handleSearch={handleSearch} isSearching={isSearching}
                 searchResults={searchResults} selectedNode={selectedNode} setSelectedNode={setSelectedNode}
             />
-            <CodePanel viewingCode={viewingCode} setViewingCode={setViewingCode} isCodeLoading={isCodeLoading} currentProject={projectName}  />
+            <CodePanel authFetch={authFetch} viewingCode={viewingCode} setViewingCode={setViewingCode} isCodeLoading={isCodeLoading} currentProject={projectName}  />
             {cycles.length > 0 && <CyclesAlert cycles={cycles} />}
             {loading ? (
                 <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%", color: "#64748b" }}>Loading architecture...</div>
             ) : (
-                <GraphVisualizer graphData={graphData} searchResults={searchResults} selectedNode={selectedNode} detailLevel={detailLevel} onNodeClick={handleNodeClick} currentProject={projectName} />
+                <GraphVisualizer authFetch={authFetch} graphData={graphData} searchResults={searchResults} selectedNode={selectedNode} detailLevel={detailLevel} onNodeClick={handleNodeClick} currentProject={projectName} />
             )}
         </div>
     );

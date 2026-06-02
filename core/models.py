@@ -51,3 +51,13 @@ class ChatRequest(BaseModel):
     node_id: str
     message: str
     selected_model: str 
+
+class AuthRequest(BaseModel):
+    username: str
+    password: str
+
+class GithubRequest(BaseModel):
+    github_url: str
+
+class PasswordChangeRequest(BaseModel):
+    new_password: str

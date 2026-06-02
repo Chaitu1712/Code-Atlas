@@ -4,13 +4,14 @@ import shutil
 import sqlite3
 import asyncio
 import subprocess
+import uvicorn
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, Query, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks
+import jwt
+from fastapi import FastAPI, Query, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 
 # Internal Core Modules
 from core.analyzer import GraphAnalyzer
@@ -23,13 +24,16 @@ from core.config import get_config, save_config, is_setup_complete
 from core.llm import CodeAtlasAI
 from core.strategies.path_normalizer import normalize_path
 from core.git_helper import get_git_authors
+from core.models import ChatRequest, AuthRequest, PasswordChangeRequest, LayoutUpdate, GithubRequest
+# Auth Modules
+from core.auth import hash_password, verify_password, create_access_token, get_current_user, SECRET_KEY, ALGORITHM
 
 # --- APP SETUP ---
 app = FastAPI(title="Code Atlas Cloud API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"], # Change this to your Vercel URL in production!
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,82 +42,154 @@ app.add_middleware(
 DATA_DIR = Path("data").resolve()
 DATA_DIR.mkdir(exist_ok=True)
 
+# --- USERS DATABASE INITIALIZATION ---
+USERS_DB = DATA_DIR / "users.db"
+def init_users_db():
+    conn = sqlite3.connect(str(USERS_DB))
+    conn.execute("CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password_hash TEXT)")
+    conn.commit()
+    conn.close()
+init_users_db()
+
 # Memory Caches
 embedder_cache = {}
 ai_cache = {}
 
-# --- WEBSOCKET MANAGER ---
+def get_user_projects_dir(username: str) -> Path:
+    d = DATA_DIR / "users" / username / "projects"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+# --- WEBSOCKET MANAGER (USER ISOLATED) ---
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
+        self.active_connections: dict[str, List[WebSocket]] = {}
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket, username: str):
         await websocket.accept()
-        self.active_connections.append(websocket)
+        if username not in self.active_connections:
+            self.active_connections[username] = []
+        self.active_connections[username].append(websocket)
 
-    def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
+    def disconnect(self, websocket: WebSocket, username: str):
+        if username in self.active_connections and websocket in self.active_connections[username]:
+            self.active_connections[username].remove(websocket)
 
-    async def broadcast(self, message: dict):
-        for connection in self.active_connections:
-            try:
-                await connection.send_json(message)
-            except Exception:
-                pass
+    async def send_personal_message(self, message: dict, username: str):
+        if username in self.active_connections:
+            for connection in self.active_connections[username]:
+                try:
+                    await connection.send_json(message)
+                except Exception:
+                    pass
 
 ws_manager = ConnectionManager()
 
 @app.websocket("/ws/progress")
-async def websocket_endpoint(websocket: WebSocket):
-    await ws_manager.connect(websocket)
+async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if not username:
+            raise Exception()
+    except Exception:
+        await websocket.close(code=1008)
+        return
+
+    await ws_manager.connect(websocket, username)
     try:
         while True:
             await websocket.receive_text() # Keep connection alive
     except WebSocketDisconnect:
-        ws_manager.disconnect(websocket)
+        ws_manager.disconnect(websocket, username)
+
+
+# --- AUTH ENDPOINTS ---
+@app.post("/api/register")
+def register_user(req: AuthRequest):
+    conn = sqlite3.connect(str(USERS_DB))
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT username FROM users WHERE username = ?", (req.username,))
+        if cursor.fetchone():
+            raise HTTPException(status_code=400, detail="Username already exists")
+            
+        cursor.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", 
+                       (req.username, hash_password(req.password)))
+        conn.commit()
+        return {"status": "success", "message": "User registered successfully"}
+    finally:
+        conn.close()
+
+@app.post("/api/login")
+def login_user(req: AuthRequest):
+    conn = sqlite3.connect(str(USERS_DB))
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT password_hash FROM users WHERE username = ?", (req.username,))
+        row = cursor.fetchone()
+        if not row or not verify_password(req.password, row[0]):
+            raise HTTPException(status_code=401, detail="Invalid username or password")
+            
+        token = create_access_token({"sub": req.username})
+        return {"access_token": token, "token_type": "bearer"}
+    finally:
+        conn.close()
+
+@app.post("/api/change-password")
+def change_password(req: PasswordChangeRequest, current_user: str = Depends(get_current_user)):
+    if len(req.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters long.")
+        
+    conn = sqlite3.connect(str(USERS_DB))
+    cursor = conn.cursor()
+    try:
+        cursor.execute("UPDATE users SET password_hash = ? WHERE username = ?", 
+                       (hash_password(req.new_password), current_user))
+        conn.commit()
+        return {"status": "success", "message": "Password updated successfully."}
+    finally:
+        conn.close()
+
 
 # --- CONFIG ENDPOINTS ---
 @app.get("/api/config")
-def read_config():
-    return {"config": get_config(), "is_setup_complete": is_setup_complete()}
+def read_config(current_user: str = Depends(get_current_user)):
+    return {"config": get_config(current_user), "is_setup_complete": is_setup_complete(current_user)}
 
 @app.post("/api/config")
-def update_config(new_config: dict):
-    current = get_config()
+def update_config(new_config: dict, current_user: str = Depends(get_current_user)):
+    current = get_config(current_user)
     current.update(new_config)
-    save_config(current)
+    save_config(current_user, current)
     return {"status": "success"}
 
+
 # --- GITHUB AUTO-INGESTION ---
-class GithubRequest(BaseModel):
-    github_url: str
 
 @app.post("/api/projects/github")
-async def add_github_project(req: GithubRequest, background_tasks: BackgroundTasks):
-    def process_github_repo():
-        # 1. Setup paths
+async def add_github_project(req: GithubRequest, background_tasks: BackgroundTasks, current_user: str = Depends(get_current_user)):
+    def process_github_repo(username: str):
         repo_name = req.github_url.rstrip('/').split('/')[-1].replace('.git', '')
-        project_dir = DATA_DIR / repo_name
+        user_projects_dir = get_user_projects_dir(username)
+        project_dir = user_projects_dir / repo_name
         
-        asyncio.run(ws_manager.broadcast({
+        asyncio.run(ws_manager.send_personal_message({
             "status": "Cloning...", 
             "message": f"Cloning {repo_name} from GitHub...", 
             "percent": 5
-        }))
+        }, username))
         
-        # Determine OS-agnostic temp directory
         temp_base = Path("C:/tmp") if os.name == 'nt' else Path("/tmp")
-        clone_dir = temp_base / repo_name
+        clone_dir = temp_base / f"{username}_{repo_name}"
         
         if clone_dir.exists():
             shutil.rmtree(clone_dir)
             
-        # Clone repository shallowly to save massive amounts of time and disk space
         try:
             subprocess.run(["git", "clone", "--depth", "1", req.github_url, str(clone_dir)], check=True)
         except subprocess.CalledProcessError as e:
-            asyncio.run(ws_manager.broadcast({"status": "Error", "message": f"Git Clone Failed: {e}", "percent": 0}))
+            asyncio.run(ws_manager.send_personal_message({"status": "Error", "message": f"Git Clone Failed: {e}", "percent": 0}, username))
             return
             
         project_dir.mkdir(parents=True, exist_ok=True)
@@ -127,18 +203,14 @@ async def add_github_project(req: GithubRequest, background_tasks: BackgroundTas
         parser = CodeParser()
         ignore_checker = GitIgnoreChecker(str(clone_dir))
         
-        # 2. Pruning Walk
         py_files = []
         valid_extensions = {'.py', '.js', '.jsx', '.ts', '.tsx'}
         
         for root, dirs, files in os.walk(clone_dir):
             root_path = Path(root)
-            try:
-                rel_root = str(root_path.relative_to(clone_dir))
-            except ValueError:
-                rel_root = ""
+            try: rel_root = str(root_path.relative_to(clone_dir))
+            except ValueError: rel_root = ""
 
-            # Prune ignored directories in-place
             for i in range(len(dirs) - 1, -1, -1):
                 if ignore_checker.is_ignored(dirs[i], os.path.join(rel_root, dirs[i])): 
                     del dirs[i]
@@ -148,21 +220,20 @@ async def add_github_project(req: GithubRequest, background_tasks: BackgroundTas
                 if file_path.suffix in valid_extensions and not ignore_checker.is_ignored(f, os.path.join(rel_root, f)):
                     py_files.append(file_path)
 
-        # 3. Parse AST
         total = len(py_files)
         if total == 0:
-            asyncio.run(ws_manager.broadcast({"status": "Error", "message": "No valid source files found.", "percent": 0}))
+            asyncio.run(ws_manager.send_personal_message({"status": "Error", "message": "No valid source files found.", "percent": 0}, username))
             db.conn.close()
-            shutil.rmtree(clone_dir)
+            shutil.rmtree(clone_dir, ignore_errors=True)
             return
 
         try:
             for i, file in enumerate(py_files, 1):
-                asyncio.run(ws_manager.broadcast({
+                asyncio.run(ws_manager.send_personal_message({
                     "status": "Parsing AST...", 
                     "message": f"File {i} of {total}: {file.name}", 
-                    "percent": int(10 + (i/total)*40) # Scales from 10% to 50%
-                }))
+                    "percent": int(10 + (i/total)*40)
+                }, username))
                 try: 
                     db.save_module(parser.parse_file(str(file)))
                 except Exception:
@@ -170,44 +241,43 @@ async def add_github_project(req: GithubRequest, background_tasks: BackgroundTas
         finally:
             db.conn.close()
 
-        # 4. Cross-Language API Linker
-        asyncio.run(ws_manager.broadcast({"status": "Linking APIs...", "message": "Detecting cross-language endpoints...", "percent": 60}))
+        asyncio.run(ws_manager.send_personal_message({"status": "Linking APIs...", "message": "Detecting cross-language endpoints...", "percent": 60}, username))
         linker = APILinker(str(db_path))
         linker.run_linkage()
 
-        # 5. Generate Semantic Embeddings
-        asyncio.run(ws_manager.broadcast({"status": "Vectorizing...", "message": "Generating AI embeddings...", "percent": 75}))
+        asyncio.run(ws_manager.send_personal_message({"status": "Vectorizing...", "message": "Generating AI embeddings...", "percent": 75}, username))
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
         embedder = EmbeddingService(str(db_path), str(index_path))
         embedder.generate_embeddings()
         
-        # 6. Cleanup to save cloud disk space
-        asyncio.run(ws_manager.broadcast({"status": "Cleaning up...", "message": "Removing raw source files...", "percent": 95}))
+        asyncio.run(ws_manager.send_personal_message({"status": "Cleaning up...", "message": "Removing raw source files...", "percent": 95}, username))
         shutil.rmtree(clone_dir, ignore_errors=True)
         gc.collect()
 
-        asyncio.run(ws_manager.broadcast({"status": "Complete!", "message": "Project is ready.", "percent": 100}))
+        asyncio.run(ws_manager.send_personal_message({"status": "Complete!", "message": "Project is ready.", "percent": 100}, username))
 
-    # Run the entire pipeline in the background so HTTP request completes instantly
-    background_tasks.add_task(process_github_repo)
+    background_tasks.add_task(process_github_repo, current_user)
     return {"status": "started"}
+
 
 # --- PROJECT MANAGEMENT ENDPOINTS ---
 @app.get("/api/projects")
-def list_projects():
-    return [d.name for d in DATA_DIR.iterdir() if d.is_dir()]
+def list_projects(current_user: str = Depends(get_current_user)):
+    user_projects_dir = get_user_projects_dir(current_user)
+    return [d.name for d in user_projects_dir.iterdir() if d.is_dir()]
 
 @app.delete("/api/projects/{project_name}")
-def delete_project(project_name: str):
-    project_dir = DATA_DIR / project_name
+def delete_project(project_name: str, current_user: str = Depends(get_current_user)):
+    user_projects_dir = get_user_projects_dir(current_user)
+    project_dir = user_projects_dir / project_name
     
-    # Invalidate Caches
-    if project_name in embedder_cache:
-        del embedder_cache[project_name]
-    if project_name in ai_cache:
-        del ai_cache[project_name]
+    cache_key = f"{current_user}_{project_name}"
+    if cache_key in embedder_cache:
+        del embedder_cache[cache_key]
+    if cache_key in ai_cache:
+        del ai_cache[cache_key]
         
-    gc.collect() # Force close SQLite handles
+    gc.collect() 
 
     if project_dir.exists() and project_dir.is_dir():
         try:
@@ -218,10 +288,11 @@ def delete_project(project_name: str):
             
     raise HTTPException(status_code=404, detail="Project not found")
 
+
 # --- GRAPH & LAYOUT ENDPOINTS ---
 @app.get("/api/graph/{project_name}")
-def get_graph(project_name: str):
-    db_path = DATA_DIR / project_name / "atlas.db"
+def get_graph(project_name: str, current_user: str = Depends(get_current_user)):
+    db_path = get_user_projects_dir(current_user) / project_name / "atlas.db"
     if not db_path.exists(): 
         raise HTTPException(status_code=404, detail="Project DB not found")
         
@@ -239,14 +310,9 @@ def get_graph(project_name: str):
     finally:
         analyzer.conn.close()
 
-class LayoutUpdate(BaseModel):
-    node_id: str
-    fx: Optional[float]
-    fy: Optional[float]
-
 @app.post("/api/graph/{project_name}/layout")
-def save_layout(project_name: str, updates: List[LayoutUpdate]):
-    db_path = DATA_DIR / project_name / "atlas.db"
+def save_layout(project_name: str, updates: List[LayoutUpdate], current_user: str = Depends(get_current_user)):
+    db_path = get_user_projects_dir(current_user) / project_name / "atlas.db"
     conn = sqlite3.connect(str(db_path))
     cursor = conn.cursor()
     
@@ -260,29 +326,32 @@ def save_layout(project_name: str, updates: List[LayoutUpdate]):
     conn.close()
     return {"status": "success"}
 
+
 # --- SEARCH & NODE DETAILS ---
-def get_embedder(project_name: str):
-    db_path = str((DATA_DIR / project_name / "atlas.db").resolve())
-    index_path = str((DATA_DIR / project_name / "atlas.index").resolve())
+def get_embedder(project_name: str, username: str):
+    db_path = str((get_user_projects_dir(username) / project_name / "atlas.db").resolve())
+    index_path = str((get_user_projects_dir(username) / project_name / "atlas.index").resolve())
+    
     if not Path(db_path).exists(): 
         raise HTTPException(status_code=404, detail="Project not found")
     
-    if project_name not in embedder_cache:
-        embedder_cache[project_name] = EmbeddingService(db_path, index_path)
+    cache_key = f"{username}_{project_name}"
+    if cache_key not in embedder_cache:
+        embedder_cache[cache_key] = EmbeddingService(db_path, index_path)
     else:
-        embedder_cache[project_name].__init__(db_path, index_path)
-    return embedder_cache[project_name]
+        embedder_cache[cache_key].__init__(db_path, index_path)
+    return embedder_cache[cache_key]
 
 @app.get("/api/search/{project_name}")
-def search_codebase(project_name: str, q: str = Query(...)):
-    embedder = get_embedder(project_name)
+def search_codebase(project_name: str, q: str = Query(...), current_user: str = Depends(get_current_user)):
+    embedder = get_embedder(project_name, current_user)
     results = embedder.search(q, top_k=5)
     gc.collect()
     return {"query": q, "results": results}
 
 @app.get("/api/node/{project_name}/{node_id:path}")
-def get_node_details(project_name: str, node_id: str):
-    db_path = DATA_DIR / project_name / "atlas.db"
+def get_node_details(project_name: str, node_id: str, current_user: str = Depends(get_current_user)):
+    db_path = get_user_projects_dir(current_user) / project_name / "atlas.db"
     node_name = node_id.split('.')[-1]
     
     conn = sqlite3.connect(str(db_path))
@@ -296,14 +365,11 @@ def get_node_details(project_name: str, node_id: str):
         for row in cursor.fetchall():
             name, node_type, parent_name, start_line, end_line, snippet, filepath = row
             
-            # Match exact global ID
             mod_name = normalize_path(filepath)
             expected_id = f"{mod_name}.{parent_name}.{name}" if parent_name else f"{mod_name}.{name}"
             
             if expected_id == node_id:
-                # Attempt to get Git Authorship (Will fail gracefully if repo was deleted to save space)
                 git_data = get_git_authors(filepath, start_line, end_line)
-                
                 return {
                     "id": node_id, "name": name, "type": node_type, "filepath": filepath, 
                     "line_start": start_line, "line_end": end_line, "code": snippet,
@@ -314,26 +380,23 @@ def get_node_details(project_name: str, node_id: str):
         
     return {"id": node_id, "type": "module/package", "message": "No code snippet available for this node."}
 
+
 # --- CLOUD-ONLY CHAT ENDPOINT ---
-class ChatRequest(BaseModel):
-    node_id: str
-    message: str
-    selected_model: str
 
 @app.post("/api/chat/{project_name}")
-async def chat_endpoint(project_name: str, req: ChatRequest):
-    db_path = str((DATA_DIR / project_name / "atlas.db").resolve())
-    project_dir = str((DATA_DIR / project_name).resolve()) 
+async def chat_endpoint(project_name: str, req: ChatRequest, current_user: str = Depends(get_current_user)):
+    db_path = str((get_user_projects_dir(current_user) / project_name / "atlas.db").resolve())
+    project_dir = str((get_user_projects_dir(current_user) / project_name).resolve()) 
     
-    if project_name not in ai_cache:
-        ai_cache[project_name] = CodeAtlasAI(db_path, project_dir)
-    ai = ai_cache[project_name]
+    cache_key = f"{current_user}_{project_name}"
+    if cache_key not in ai_cache:
+        ai_cache[cache_key] = CodeAtlasAI(db_path, project_dir, current_user)
     
+    ai = ai_cache[cache_key]
     return StreamingResponse(
         ai.stream_chat(req.node_id, req.message, req.selected_model), 
         media_type="text/plain"
     )
-
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="0.0.0.0", port=8000)
+    
+if __name__ == "__main__":
+     uvicorn.run(app, host="0.0.0.0", port=8000)

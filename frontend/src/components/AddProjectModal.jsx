@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-export default function AddProjectModal({ onClose, onSuccess }) {
+export default function AddProjectModal({ onClose, onSuccess, authFetch }) {
     const [githubUrl, setGithubUrl] = useState('');
     const [extractedRepoName, setExtractedRepoName] = useState('');
     
@@ -13,8 +13,12 @@ export default function AddProjectModal({ onClose, onSuccess }) {
 
     // 1. Connect to WebSocket
     useEffect(() => {
+        const token = localStorage.getItem('codeAtlasToken');
+        if (!token) return;
+
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-        const wsUrl = apiUrl.replace(/^http/, 'ws') + '/ws/progress';
+        const wsUrl = apiUrl.replace(/^http/, 'ws') + `/ws/progress?token=${token}`;
+
         const ws = new WebSocket(wsUrl);
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
@@ -51,7 +55,8 @@ export default function AddProjectModal({ onClose, onSuccess }) {
         setExtractedRepoName(repoName);
 
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/api/projects/github', {
+            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+            const res = await authFetch(`${apiUrl}/api/projects/github`, {
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ github_url: cleanUrl })

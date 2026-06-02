@@ -10,3 +10,5 @@ tree-sitter-javascript==0.25.0
 tree-sitter-python==0.25.0
 tree-sitter-typescript==0.23.2
 uvicorn==0.41.0
+PyJWT==2.13.0
+bcrypt==5.0.0

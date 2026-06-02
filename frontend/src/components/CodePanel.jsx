@@ -6,7 +6,7 @@ import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/atom-one-dark.css'; // Markdown code block theme
 import { IconClose, IconAuthor, IconModifier } from './Icons';
 
-export default function CodePanel({ viewingCode, setViewingCode, isCodeLoading, currentProject }) {
+export default function CodePanel({ viewingCode, setViewingCode, isCodeLoading, currentProject, authFetch }) {
     const [activeTab, setActiveTab] = useState('code'); 
     const [config, setConfig] = useState(null);
     const [mode, setMode] = useState('online');
@@ -20,7 +20,8 @@ export default function CodePanel({ viewingCode, setViewingCode, isCodeLoading, 
 
     // 1. Fetch config on mount
     useEffect(() => {
-        fetch(import.meta.env.VITE_API_URL + '/api/config')
+        const apiUrl= import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        authFetch(`${apiUrl}/api/config`)
             .then(res => res.json())
             .then(data => {
                 setConfig(data.config);
@@ -38,15 +39,15 @@ export default function CodePanel({ viewingCode, setViewingCode, isCodeLoading, 
         const updates = { mode: newMode };
         if (newMode === 'online') updates.active_online_model = newModel;
         else updates.active_local_model = newModel;
-
-        await fetch(import.meta.env.VITE_API_URL + '/api/config', {
+        const apiUrl= import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        await authFetch(`${apiUrl}/api/config`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updates)
         });
         
         // Refresh local config state
-        const res = await fetch(import.meta.env.VITE_API_URL + '/api/config');
+        const res = await authFetch(`${apiUrl}/api/config`);
         const data = await res.json();
         setConfig(data.config);
     };
@@ -73,7 +74,8 @@ export default function CodePanel({ viewingCode, setViewingCode, isCodeLoading, 
         setMessages(prev => [...prev, { role: 'assistant', text: '' }]);
 
         try {
-            const response = await fetch(import.meta.env.VITE_API_URL + `/api/chat/${currentProject}`, {
+            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+            const response = await authFetch(`${apiUrl}/api/chat/${currentProject}`,  {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ node_id: viewingCode.id, message: userMsg, selected_model: selectedModel })

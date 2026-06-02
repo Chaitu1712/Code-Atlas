@@ -42,7 +42,7 @@ export default function AuthPage({ setToken }) {
         <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center", background: "#0f172a", fontFamily: "Inter, sans-serif" }}>
             <div style={{ background: "#ffffff", padding: "40px", borderRadius: "16px", width: "350px", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}>
                 <div style={{ display: "flex", justifyContent: "center", marginBottom: "20px" }}>
-                <img src="../../public/logo.png" alt="Logo" style={{ width: "40px", height: "40px", marginRight: "10px", borderRadius: "10px" }} />
+                <img src="/logo.png" alt="Logo" style={{ width: "40px", height: "40px", marginRight: "10px", borderRadius: "10px" }} />
                 <h1 style={{ margin: "0 0 5px 0", color: "#0f172a", textAlign: "center" }}>Code Atlas</h1>
                 </div>
                 <p style={{ color: "#64748b", textAlign: "center", marginBottom: "30px", fontSize: "14px" }}>

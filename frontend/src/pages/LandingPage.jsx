@@ -41,7 +41,7 @@ export default function LandingPage({ authFetch, handleLogout }) {
                 <div style={{  display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "64px" }}>
                     <div>
                     <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "0" }}>
-                    <img src="../../public/logo.png" alt="Code Atlas Logo" style={{ width: "48px", height: "48px", marginBottom: "0", borderRadius: "25%" }} />
+                    <img src="/logo.png" alt="Code Atlas Logo" style={{ width: "48px", height: "48px", marginBottom: "0", borderRadius: "25%" }} />
                     <h1 style={{ fontSize: "48px", fontWeight: "700", color: "#191c1e", letterSpacing: "-0.02em", margin: "0 0 0 0", lineHeight: "56px" }}>Code Atlas</h1>
                     </div>
                     <p style={{ color: "#414755", fontSize: "18px", margin: "8px 0 0 0", fontWeight: "400", lineHeight: "28px" }}>The architecture map for complex codebases.</p>
